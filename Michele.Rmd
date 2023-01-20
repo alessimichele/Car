@@ -39,6 +39,55 @@ ggplot(car[ car$Kilometer < 100 & car$Kilometer >50 & car$Price>exp(13) & car$Pr
   scale_size(range = c(.2, 7), name="Engine")
 ```
 
+```{r}
+# Charge libraries:
+library(ggplot2)
+library(gganimate)
+library(gifski)
+ 
+# Make a ggplot, but add frame=year: one image per year
+myPlot <- ggplot(car, aes(Kilometer, log(Price))) +
+  geom_point(alpha = 0.5, show.legend = FALSE) +
+  
+  scale_x_log10() +
+  facet_wrap(~Fuel.Type) +
+  # Here comes the gganimate specific bits
+  labs(title = 'Year: {frame_time}', x = 'Kilometer', y = 'Price') +
+  transition_time(Year) +
+  ease_aes('linear')
+
+# Save at gif:
+
+
+animate(myPlot, duration = 16, fps = 30, width = 200, height = 200, renderer = gifski_renderer(), res = 250)
+anim_save("output.gif")
+```
+
+```{r}
+library(ggplot2)
+library(gganimate)
+library(dplyr)
+
+
+# Keep only 3 names
+don <- car %>% 
+  filter(Fuel.Type %in% c("Diesel", "Petrol", "Other"))
+  
+# Plot
+myPlot <- don %>%
+  ggplot( aes(x=Year, y=log(Price), group=Fuel.Type, color=Fuel.Type)) +
+    geom_line() +
+    geom_point() +
+    ggtitle("Selling Price wrt Fuel Type") +
+    ylab("Log Price") +
+    transition_reveal(Year)
+
+animate(myPlot, duration = 10, fps = 40, width = 200, height = 200, renderer = gifski_renderer())
+anim_save("output1.gif")
+```
+
+
+############
 ```{r cars}
 set.seed(1)
 index <- sample(nrow(car), nrow(car)*0.8, replace=F)
@@ -66,13 +115,12 @@ The adjusted $R^2$ is 0.7904685
 Looking at the residuals plot vs the continuous explanatory variable is a good check to highlight (if there are) structures/patterns in the residuals:
 
 ```{r}
-Residuals <- lm$residuals
-ggplot(data=train,aes(x = Price, y = Residuals)) +
+ggplot(data=train,aes(x = Price, y =  lm$residuals)) +
   geom_point(alpha = .25, color = '#D55E00') +
-  geom_smooth(aes(), color = '#56B4E9', se = F)
-  labs(x = 'Fitted value', title = 'Fitted vs. Observed') +
+  geom_smooth(color = '#56B4E9', se = F) +
+  labs(x = 'Price', y = 'Residuals', title = 'Fitted vs. Observed') +
   #hrbrthemes::theme_ipsum_rc() +
-  theme(title = element_text(colour = '#585858'))
+  theme(title = element_text(colour = 'black'))
 ```
 We can see that the mean is almost 0 but there is a linear relationship with the price.
 Let's see the residuals plot:
@@ -277,9 +325,7 @@ stat_function(fun = dnorm,
               lwd = 1,
               alpha = 1)
 
-# questo si può togliere
-hist.scott(lm1$residuals, freq = F)
-curve(dnorm(x,0,sd(lm1$residuals)), add=T, col=2)
+
 ```
 
 Also the residual plot is better.
@@ -457,7 +503,19 @@ ggplot(data=train,aes(x = seq(nrow(train)), y = log_price)) +
 
 ```{r}
 par(mfrow=c(2,2))
-plot(lm_pwr)
+plot(lm_pwr,
+      bty = 'n',
+  pch = 19,
+  col = scales::alpha('#D55E00', .1),
+  #col.smooth = '#56B4E9',
+  lwd = 1,
+  cex =.95,
+  col.lab = 'gray25',
+  col.axis = 'gray50',
+  col.sub = 'gray50',
+  cex.caption = 1,
+  cex.oma.main = 1.25,
+  yaxt = 'n')
 ```
 
 
@@ -468,17 +526,74 @@ Let's try to plot residuals vs all the covariates.
 ```{r}
 par(mfrow=c(1,1))
 plot(as.factor(train$Make), lm_pwr$residuals)
-plot(train$Year, lm_pwr$residuals)
-plot(train$Kilometer, lm_pwr$residuals)
-plot(train$Engine, lm_pwr$residuals)
-plot(train$Power, lm_pwr$residuals)
-plot(train$Torque, lm_pwr$residuals)
-plot(train$Length, lm_pwr$residuals)
-plot(train$Width, lm_pwr$residuals)
-plot(train$Height, lm_pwr$residuals)
-plot(train$TankCapacity, lm_pwr$residuals)
+
+# Year vs Res
+
+ggplot(data=train,aes(x = Year, y = lm_pwr$residuals)) +
+  geom_point(alpha = .25, color = '#D55E00') +
+  labs(x = 'Year', y = "Residuals", title = 'Year vs. Residuals') +
+  theme(title = element_text(colour = '#585858'))
+
+# Km vs Res
+
+ggplot(data=train,aes(x = Kilometer, y = lm_pwr$residuals)) +
+  geom_point(alpha = .25, color = '#D55E00') +
+  labs(x = 'Kilometer', y = "Residuals", title = 'Kilometer vs. Residuals') +
+  theme(title = element_text(colour = '#585858'))
+
+# Engine vs Res
+
+ggplot(data=train,aes(x = Engine, y = lm_pwr$residuals)) +
+  geom_point(alpha = .25, color = '#D55E00') +
+  labs(x = 'Engine', y = "Residuals", title = 'Engine vs. Residuals') +
+  theme(title = element_text(colour = '#585858'))
+
+# Power vs Res
+
+ggplot(data=train,aes(x = Power, y = lm_pwr$residuals)) +
+  geom_point(alpha = .25, color = '#D55E00') +
+  labs(x = 'Power', y = "Residuals", title = 'Power vs. Residuals') +
+  theme(title = element_text(colour = '#585858'))
+
+# Torque vs Res
+
+ggplot(data=train,aes(x = Torque, y = lm_pwr$residuals)) +
+  geom_point(alpha = .25, color = '#D55E00') +
+  labs(x = 'Torque', y = "Residuals", title = 'Torque vs. Residuals') +
+  theme(title = element_text(colour = '#585858'))
+
+# Length vs Res
+
+mygroup <- c(0,4200, max(train$Length))
+ggplot(data=train,aes(x = Length, y = lm_pwr$residuals)) +
+  geom_point(alpha = .25, aes(colour =  cut(Length,breaks = mygroup) ), , show.legend=F) +
+  labs(x = 'Length', y = "Residuals", title = 'Length vs. Residuals') +
+  theme(title = element_text(colour = '#585858'))
+
+# Width vs Res
+
+ggplot(data=train,aes(x = Width, y = lm_pwr$residuals)) +
+  geom_point(alpha = .25, color = '#D55E00') +
+  labs(x = 'Width', y = "Residuals", title = 'Width vs. Residuals') +
+  theme(title = element_text(colour = '#585858'))
+
+# Height vs Res
+
+ggplot(data=train,aes(x = Height, y = lm_pwr$residuals)) +
+  geom_point(alpha = .25, color = '#D55E00') +
+  labs(x = 'Height', y = "Residuals", title = 'Height vs. Residuals') +
+  theme(title = element_text(colour = '#585858'))
+
+# TankCapacity vs Res
+
+ggplot(data=train,aes(x = TankCapacity, y = lm_pwr$residuals)) +
+  geom_point(alpha = .25, color = '#D55E00') +
+  labs(x = 'TankCapacity', y = "Residuals", title = 'TankCapacity vs. Residuals') +
+  theme(title = element_text(colour = '#585858'))
+
 ```
-There are not particular patterns between residuals and covariates.
+
+Pattern in length???
 Except in kilometer, where we can see a point with a very high leverage (outlier?).
 
 Let's try with lasso regression:
@@ -551,12 +666,24 @@ anova(lm_noMake,lm_pwr)
 
 ```{r}
 par(mfrow=c(1,1))
-plot(train$log_price, lm2$residuals)
+plot(train$log_price, lm_noMake$residuals)
 ```
 
 ```{r}
 par(mfrow=c(2,2))
-plot(lm_noMake)
+plot(lm_noMake,
+      bty = 'n',
+  pch = 19,
+  col = scales::alpha('#D55E00', .1),
+  #col.smooth = '#56B4E9',
+  lwd = 1,
+  cex =.95,
+  col.lab = 'gray25',
+  col.axis = 'gray50',
+  col.sub = 'gray50',
+  cex.caption = 1,
+  cex.oma.main = 1.25,
+  yaxt = 'n')
 ```
 
 
@@ -580,7 +707,20 @@ anova(lm3, lm_pwr)
 Ci piace di più quello ridotto.
 
 ```{r}
-plot(lm3)
+par(mfrow=c(1,1))
+plot(lm3,
+      bty = 'n',
+  pch = 19,
+  col = scales::alpha('#D55E00', .1),
+  #col.smooth = '#56B4E9',
+  lwd = 1,
+  cex =.95,
+  col.lab = 'gray25',
+  col.axis = 'gray50',
+  col.sub = 'gray50',
+  cex.caption = 1,
+  cex.oma.main = 1.25,
+  yaxt = 'n')
 ```
 
 
@@ -596,7 +736,20 @@ anova(lm4,lm3)
 ```
 
 ```{r}
-plot(lm4)
+par(mfrow=c(1,1))
+plot(lm4,
+      bty = 'n',
+  pch = 19,
+  col = scales::alpha('#D55E00', .1),
+  #col.smooth = '#56B4E9',
+  lwd = 1,
+  cex =.95,
+  col.lab = 'gray25',
+  col.axis = 'gray50',
+  col.sub = 'gray50',
+  cex.caption = 1,
+  cex.oma.main = 1.25,
+  yaxt = 'n')
 ```
 
 Just to try, I remove a significant covariate, for example "Length" from lm3:
