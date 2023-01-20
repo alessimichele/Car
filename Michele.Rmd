@@ -21,7 +21,7 @@ car <- read.csv("./car.csv")
 car <- car[car$Kilometer != 2000.000,]
 ```
 
-
+# Esperimento di data visualization
 ```{r}
 # esperimento per data visualization
 
@@ -87,7 +87,7 @@ anim_save("output1.gif")
 ```
 
 
-############
+# Linear Model
 ```{r cars}
 set.seed(1)
 index <- sample(nrow(car), nrow(car)*0.8, replace=F)
@@ -763,5 +763,12 @@ anova(lm5,lm3)
 
 # We can see that the p-value is low so lm3 is better than lm5, this means that Length is significant
 ```
+
+
+
+
+
+
+
 
 
