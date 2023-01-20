@@ -203,7 +203,7 @@ Let's try with lasso regression:
 
 ```{r}
 library(glmnet)
-xx <- model.matrix(log_price~.-log_price-Price-Engine-Torque, data=train)
+xx <- model.matrix(log_price~.-log_price-Price, data=train)
 fit.lasso <- glmnet(xx,train$log_price, alpha=1) # alpha=1 selects lasso
 plot(fit.lasso,"lambda")
 ```
@@ -211,7 +211,7 @@ plot(fit.lasso,"lambda")
 
 ```{r}
 set.seed(1)
-cv_model <- cv.glmnet(xx, train$log_price, alpha = 1)
+cv_model <- cv.glmnet(xx, train$log_price-Engine-Torque, alpha = 1)
 plot(cv_model)
 
 best_lambda <- cv_model$lambda.1se
@@ -328,5 +328,28 @@ anova(lm5,lm3)
 
 # We can see that the p-value is low so lm3 is better than lm5, this means that Length is significant
 ```
+Just do the test on the  test set with lm4 (withou ENgine, Torque, Seller Typ and Drive Train):
 
+```{r}
+summary(lm4)
+test$log_price <- log(test$Price)
+predicted_test <- predict(lm4, newdata = test)
+plot(predicted_test, test$log_price)
+#plot(exp(predicted_test), exp(test$log_price))
+abline(a=0, b=1, col=2,lwd=2)
+#rmse <- sqrt(sum((exp(predicted_test) - test$log_price)^2)/length(test$log_price))
+#c(RMSE = rmse, R2=summary(lm4)$r.squared)
+```
+
+```{r}
+#print(sort(predicted_test-test$log_price))
+```
+
+Model 4 with interactions:
+```{r}
+lm4_interactions <- lm(log_price ~ as.factor(Make)+Year+Kilometer+as.factor(Fuel.Type)+as.factor(Transmission)+
+         as.factor(Owner)+Power+Length+Width+Height+as.factor(SeatingCapacity)
+         +TankCapacity+Year:Kilometer, data=train)
+summary(lm4_interactions)
+```
 
