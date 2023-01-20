@@ -172,12 +172,21 @@ plot(glm_no_make)
 set.seed(NULL)
 
 
-glm_lasso_cv <- cv.glmnet(xx,car$price,alpha=1,family=Gamma(link="log"))
+glm_lasso_cv <- cv.glmnet(xx,train$Price,alpha=1,family=Gamma(link="log"))
 plot(glm_lasso_cv)
-glm_lasso <- glmnet(xx,car$price,alpha=1,family=Gamma(link="log"),lambda = glm_lasso_cv$lambda.1se)
-glmnet:::deviance.glmnet(glm_lasso) + 2*(glm_lasso$df + 1)
+glm_lasso <- glmnet(xx,train$Price,alpha=1,family=Gamma(link="log"),lambda = glm_lasso_cv$lambda.1se)
+#glmnet:::deviance.glmnet(glm_lasso) + 2*(glm_lasso$df + 1)
 coef.glmnet(glm_lasso)
+glm_lasso
 ```
+```{r}
+
+xx_test <- model.matrix(Price~.,data=test)
+plot(predict(glm_lasso,newx = xx_test,type="link"),log(test$Price))
+abline(a=0,b=1,col=2)
+```
+
+
 
 
 
@@ -205,6 +214,17 @@ glm_ridge
 ```
 
 
+
+
+
+
+
+
+## Interaction
+```{r}
+glm_inter <- glm(Price~Make+Kilometer+Year+Owner+Power, data= train,family=Gamma("log"))
+summary(glm_inter)
+```
 
 
 
