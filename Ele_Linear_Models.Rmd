@@ -41,6 +41,22 @@ test <- car[-index,]
 nrow(train)+nrow(test)==nrow(car)
 ```
 
+```{r}
+library(ggplot2)
+cor_mat <- round(cor(car[,unlist(lapply(car, is.numeric), use.names = FALSE)]),2)
+data<-expand.grid(X=unlist(dimnames(cor_mat)[2]),Y=unlist(dimnames(cor_mat)[2]))
+data$Z<- c(cor_mat)
+ggplot(data,aes(X,Y,fill=Z))+geom_tile()+theme(axis.text.x=element_text(angle = -90, hjust = 0))+coord_equal()+scale_y_discrete(limits=rev)+geom_text(aes(label=prettyNum(Z,digits=2,format="f")), color="white", size=4)
+
+```
+
+From the book: "The equation $E(Y_i) = \beta_0 + \beta_1 x_{i1} + ...+ \beta_p x_{ip}$ assumes that the relationship between $E(Y )$ and each $x_j$ is linear"
+
+```{r}
+pairs(~1/Kilometer+., data=car[,unlist(lapply(car, is.numeric), use.names = FALSE)])
+```
+
+
 Fit a simple linear model with all the covariates:
 ```{r}
 lm <- lm(Price ~ as.factor(Make)+Year+Kilometer+as.factor(Fuel.Type)+as.factor(Transmission)+
@@ -171,8 +187,6 @@ plot(d,main='Residuals Plot',xlab='Residual value')
 ```
 The tails are not perfect but not so bad.
 
-
-
 ```{r}
 par(mfrow=c(2,2))
 plot(lm_pwr)
@@ -186,14 +200,21 @@ Let's try to plot residuals vs all the covariates.
 ```{r}
 par(mfrow=c(1,1))
 plot(as.factor(train$Make), lm_pwr$residuals)
+plot(train$log_price,lm_pwr$residuals)
 plot(train$Year, lm_pwr$residuals)
 plot(train$Kilometer, lm_pwr$residuals)
+plot(as.factor(train$Fuel.Type), lm_pwr$residuals)
+plot(as.factor(train$Transmission), lm_pwr$residuals)
+plot(as.factor(train$Owner), lm_pwr$residuals)
+plot(as.factor(train$Seller.Type), lm_pwr$residuals)
 plot(train$Engine, lm_pwr$residuals)
 plot(train$Power, lm_pwr$residuals)
 plot(train$Torque, lm_pwr$residuals)
+plot(as.factor(train$Drivetrain), lm_pwr$residuals)
 plot(train$Length, lm_pwr$residuals)
 plot(train$Width, lm_pwr$residuals)
 plot(train$Height, lm_pwr$residuals)
+plot(as.factor(train$SeatingCapacity), lm_pwr$residuals)
 plot(train$TankCapacity, lm_pwr$residuals)
 ```
 There are not particular patterns between residuals and covariates.
@@ -211,7 +232,7 @@ plot(fit.lasso,"lambda")
 
 ```{r}
 set.seed(1)
-cv_model <- cv.glmnet(xx, train$log_price-Engine-Torque, alpha = 1)
+cv_model <- cv.glmnet(xx, train$log_price, alpha = 1)
 plot(cv_model)
 
 best_lambda <- cv_model$lambda.1se
@@ -269,7 +290,7 @@ anova(lm_noMake,lm_pwr)
 
 ```{r}
 par(mfrow=c(1,1))
-plot(train$log_price, lm2$residuals)
+plot(train$log_price, lm_pwr$residuals)
 ```
 
 ```{r}
@@ -277,11 +298,16 @@ par(mfrow=c(2,2))
 plot(lm_noMake)
 ```
 
-
 Let's try to remove by hand not significant variables from the first model (with logarithm):
 
 ```{r}
 summary(lm_pwr)
+```
+
+```{r}
+library(car)
+vif(lm1)
+vif(lm_pwr)
 ```
 
 We can see that both levels of "seller" are not significant, let's try to remove it
@@ -311,11 +337,28 @@ lm4 <- lm(log_price ~ as.factor(Make)+Year+Kilometer+as.factor(Fuel.Type)+as.fac
 summary(lm4)
 AIC(lm4)
 anova(lm4,lm3)
+vif(lm4)
 ```
 
 ```{r}
 plot(lm4)
 ```
+
+```{r}
+plot(lm4$residuals)
+```
+
+Try to remove another explanatory variable, for example "Seating Capacity"
+
+```{r}
+lm6 <- lm(log_price ~ as.factor(Make)+Year+Kilometer+as.factor(Fuel.Type)+as.factor(Transmission)+
+         as.factor(Owner)+Power+Length+Width+Height+TankCapacity, data=train)
+summary(lm6)
+AIC(lm4)
+AIC(lm6)
+anova(lm6,lm4)
+```
+We can see that the more complex model is better!!
 
 Just to try, I remove a significant covariate, for example "Length" from lm3:
 
@@ -328,7 +371,7 @@ anova(lm5,lm3)
 
 # We can see that the p-value is low so lm3 is better than lm5, this means that Length is significant
 ```
-Just do the test on the  test set with lm4 (withou ENgine, Torque, Seller Typ and Drive Train):
+Just do the test on the test set with lm4 (without Engine, Torque, Seller Type and Drive Train):
 
 ```{r}
 summary(lm4)
@@ -337,9 +380,14 @@ predicted_test <- predict(lm4, newdata = test)
 plot(predicted_test, test$log_price)
 #plot(exp(predicted_test), exp(test$log_price))
 abline(a=0, b=1, col=2,lwd=2)
-#rmse <- sqrt(sum((exp(predicted_test) - test$log_price)^2)/length(test$log_price))
-#c(RMSE = rmse, R2=summary(lm4)$r.squared)
+sum(abs(exp(predicted_test)-exp(test$log_price))/exp(test$log_price))/length(test$log_price)
 ```
+
+```{r}
+larger.res <- which(abs(lm4$residuals)>0.5)
+df_res <- train[larger.res,]
+```
+
 
 ```{r}
 #print(sort(predicted_test-test$log_price))
@@ -352,4 +400,30 @@ lm4_interactions <- lm(log_price ~ as.factor(Make)+Year+Kilometer+as.factor(Fuel
          +TankCapacity+Year:Kilometer, data=train)
 summary(lm4_interactions)
 ```
+
+
+```{r}
+plot(lm4,which=c(1,2,4,5))
+```
+
+```{r}
+lm_step <- step(lm1, scale = 0,
+     direction = c("both", "backward", "forward"),steps = 1000, k = 2)
+summary(lm_step)
+length(coefficients(lm_step))
+length(coefficients(lm1))
+```
+
+With respect to the first model (lm1), the step function removes:
+  - Seller type
+  - Engine
+  - Torque
+  - Drive train
+Like I did in the final lm4.
+
+```{r}
+final4_vs_step <- c(AIC(lm4), AIC(lm_step))
+final4_vs_step
+```
+
 
