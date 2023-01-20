@@ -34,7 +34,6 @@ set.seed(1)
 index <- sample(nrow(car), nrow(car)*0.8, replace=F)
 train <- car[index,]
 test <- car[-index,]
-
 ```
 
 ```{r}
@@ -186,6 +185,7 @@ Let's try to plot residuals vs all the covariates.
 ```{r}
 par(mfrow=c(1,1))
 plot(as.factor(train$Make), lm_pwr$residuals)
+plot(train$log_price,lm_pwr$residuals)
 plot(train$Year, lm_pwr$residuals)
 plot(train$Kilometer, lm_pwr$residuals)
 plot(train$Engine, lm_pwr$residuals)
@@ -269,7 +269,7 @@ anova(lm_noMake,lm_pwr)
 
 ```{r}
 par(mfrow=c(1,1))
-plot(train$log_price, lm2$residuals)
+plot(train$log_price, lm_pwr$residuals)
 ```
 
 ```{r}
@@ -277,12 +277,18 @@ par(mfrow=c(2,2))
 plot(lm_noMake)
 ```
 
-
 Let's try to remove by hand not significant variables from the first model (with logarithm):
 
 ```{r}
 summary(lm_pwr)
 ```
+
+```{r}
+library(car)
+vif(lm1)
+vif(lm_pwr)
+```
+
 
 We can see that both levels of "seller" are not significant, let's try to remove it
 
@@ -311,11 +317,17 @@ lm4 <- lm(log_price ~ as.factor(Make)+Year+Kilometer+as.factor(Fuel.Type)+as.fac
 summary(lm4)
 AIC(lm4)
 anova(lm4,lm3)
+vif(lm4)
 ```
 
 ```{r}
 plot(lm4)
 ```
+
+```{r}
+plot(lm4$residuals)
+```
+
 
 Just to try, I remove a significant covariate, for example "Length" from lm3:
 
@@ -328,7 +340,7 @@ anova(lm5,lm3)
 
 # We can see that the p-value is low so lm3 is better than lm5, this means that Length is significant
 ```
-Just do the test on the  test set with lm4 (withou ENgine, Torque, Seller Typ and Drive Train):
+Just do the test on the test set with lm4 (without Engine, Torque, Seller Type and Drive Train):
 
 ```{r}
 summary(lm4)
@@ -340,6 +352,12 @@ abline(a=0, b=1, col=2,lwd=2)
 #rmse <- sqrt(sum((exp(predicted_test) - test$log_price)^2)/length(test$log_price))
 #c(RMSE = rmse, R2=summary(lm4)$r.squared)
 ```
+
+```{r}
+larger.res <- which(abs(lm4$residuals)>0.5)
+df_res <- train[larger.res,]
+```
+
 
 ```{r}
 #print(sort(predicted_test-test$log_price))
