@@ -24,21 +24,26 @@ ggplot(data,aes(X,Y,fill=Z))+geom_tile()+theme(axis.text.x=element_text(angle = 
 
 
 
-
+## Importing the data
+We have a dataset of 1993 observations, obtained from the original data by removing observations with too many missing values, imputing some other missing values and removing outliers. We transform categorical variables into factors. We then split the dataset in train and test sets.
 ```{r}
-car<-read.csv("data/car_pulito.csv")
+car<-read.csv("car.csv")
 
 # Transform categorical variables into factors
-car$make <- as.factor(car$make)
-car$fuel <- as.factor(car$fuel)
-car$transmission <- as.factor(car$transmission)
-car$owner <- as.factor(car$owner)
-car$seller<- as.factor(car$seller)
-car$drivetrain <- as.factor(car$drivetrain)
-car$seats <- as.factor(car$seats)
-car$km <- car$km/1000 #kilometers are in thousands
+car$Make <- as.factor(car$Make)
+car$Fuel.Type <- as.factor(car$Fuel.Type)
+car$Transmission <- as.factor(car$Transmission)
+car$Owner <- as.factor(car$Owner)
+car$Seller.Type<- as.factor(car$Seller.Type)
+car$Drivetrain <- as.factor(car$Drivetrain)
+car$SeatingCapacity <- as.factor(car$SeatingCapacity)
 
-colnames(car)
+car <- car[car$Kilometer != 2000,]
+
+set.seed(1)
+index <- sample(nrow(car)*0.8,replace = F)
+train <- car[index,]
+test <- car[-index,]
 ```
 
 
@@ -74,22 +79,42 @@ hist.scott(sqrt(car$km[-c(km_outliers,1767)]),prob = F)
 ```
 
 
+
+
 # The (mis)fits
 
 
 ```{r}
 ## build a model matrix
-xx <- model.matrix(price~.-price,data=car)
+xx <- model.matrix(Price~.-Price,data=train)
+```
+
+
+We fit a glm with Gamma(log). The choice for a Gamma is justified by the fact that prices are always positive and from the inspection of price vs years it appears that higher prices have larger variance. 
+```{r}
+glm_full <- glm(Price~.,data=train,family=Gamma(link="log"))
+summary(glm_full)
+
+qn <- qqnorm(residuals(glm_full,"pearson")/sqrt(0.04303429),col=2) ## qqplot with dispersion param normalisation
+plot(glm_full,which=2) ## qqplot
+points(qn$x,qn$y,col=alpha(2,0.4),pch=20)
+
+plot(predict(glm_full,newdata = test,type="link"),log(test$Price))
+abline(a=0,b=1,col=2)
 ```
 
 
 
 ```{r}
-glm_full <- glm(price~.,data=car,family=Gamma(link="log"))
-summary(glm_full)
-
-glm_reduced_make <- glm(price~.-seller-engine-torque-drivetrain,data=car,family = Gamma(link="log"))
+glm_reduced_make <- glm(Price~.-Seller.Type-Engine-Torque-Drivetrain,data=train,family = Gamma(link="log"))
 summary(glm_reduced_make)
+
+qn_r <- qqnorm(residuals(glm_reduced_make,"pearson")/sqrt(0.04303429),col=2) ## qqplot with dispersion param normalisation
+plot(glm_reduced_make,which=2) ## qqplot
+points(qn_r$x,qn_r$y,col=alpha(2,0.4),pch=20)
+
+plot(predict(glm_reduced_make,newdata = test,type="response"),test$Price)
+abline(a=0,b=1,col=2)
 ```
 
 ```{r}
@@ -101,8 +126,8 @@ stepAIC(glm_full)
 
 ### histogram of residuals
 ```{r}
-myhist<-hist.scott(residuals(glm_full,"pearson")/sqrt(0.04377756),prob=F,col=alpha(7,0.4))
-p<-dnorm(myhist$mids,0,1)*0.2
+myhist<-hist.scott(residuals(glm_full,"pearson")/sqrt(0.04303429),prob=F,col=alpha(7,0.4))
+p<-dnorm(myhist$mids,0,1)*0.5
 sd<-sqrt(length(residuals(glm_full))*p*(1-p))
 points(myhist$mids,length(residuals(glm_full))*p,pch=20,col=4)
 segments(myhist$mids,length(residuals(glm_full))*p-sd,myhist$mids,length(residuals(glm_full))*p+sd,col=4)
