@@ -9,36 +9,42 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
+```{r}
+library(ggplot2)
+```
+
 Import the dataset:
 
 ```{r cars}
 car <- read.csv("./car.csv")
 # Remove observation 1080
 car <- car[car$Kilometer != 2000.000,]
+```
 
-#library(dplyr)
-#make this example reproducible
+
+```{r}
+# esperimento per data visualization
+
+# capisco dove ci sono piu dati
+ggplot(car, aes(x=Kilometer, y=log(Price) )) +
+  geom_bin2d(bins = 30) +
+  scale_fill_continuous(type = "viridis") +
+  theme_bw()
+```
+
+```{r}
+# analizzo quella fetta di dati
+ggplot(car[ car$Kilometer < 100 & car$Kilometer >50 & car$Price>exp(13) & car$Price< exp(15),], aes(x=Kilometer, y=log(Price), size = Engine, color = Fuel.Type)) +
+    geom_point(alpha=0.5) +
+  scale_size(range = c(.2, 7), name="Engine")
+```
+
+```{r cars}
 set.seed(1)
-# shuffle the dataframe by rows
-#car= car[sample(1:nrow(car)), ]
-
-#create ID column
-#car$id <- 1:nrow(car)
-
-#use 80% of dataset as training set and 20% as test set
-#train <- car %>% dplyr::sample_frac(0.80)
-#test <- dplyr::anti_join(car, train, by = 'id')
-
-#train <- train[, -18]
-#test <- test[, -18]
 index <- sample(nrow(car), nrow(car)*0.8, replace=F)
 train <- car[index,]
 test <- car[-index,]
 
-```
-
-```{r}
-nrow(train)+nrow(test)==nrow(car)
 ```
 
 Fit a simple linear model with all the covariates:
@@ -60,17 +66,143 @@ The adjusted $R^2$ is 0.7904685
 Looking at the residuals plot vs the continuous explanatory variable is a good check to highlight (if there are) structures/patterns in the residuals:
 
 ```{r}
-par(mfrow=c(1,1))
-plot(train$Price, lm$residuals)
+Residuals <- lm$residuals
+ggplot(data=train,aes(x = Price, y = Residuals)) +
+  geom_point(alpha = .25, color = '#D55E00') +
+  geom_smooth(aes(), color = '#56B4E9', se = F)
+  labs(x = 'Fitted value', title = 'Fitted vs. Observed') +
+  #hrbrthemes::theme_ipsum_rc() +
+  theme(title = element_text(colour = '#585858'))
 ```
 We can see that the mean is almost 0 but there is a linear relationship with the price.
 Let's see the residuals plot:
 
 ```{r}
 # Plot the residuals and the fitted values.
-par(mfrow=c(2,2))
-plot(lm)
+plot(
+  lm,
+  which = 1,
+  bty = 'n',
+  pch = 19,
+  col = scales::alpha('#D55E00', .1),
+  #col.smooth = '#56B4E9',
+  lwd = 2,
+  cex = .95,
+  col.lab = 'gray25',
+  col.axis = 'gray50',
+  col.sub = 'gray50',
+  cex.caption = 1,
+  cex.oma.main = 1.25,
+  yaxt = 'n'
+)
+axis(2, col = 'gray75', col.axis = 'gray33')
+axis(1, col = 'gray75', col.axis = 'gray33')
 ```
+```{r}
+plot(
+  lm,
+  which = 2,
+  bty = 'n',
+  pch = 19,
+  col = scales::alpha('#D55E00', .1),
+  #col.smooth = '#56B4E9',
+  lwd = 1,
+  cex =.95,
+  col.lab = 'gray25',
+  col.axis = 'gray50',
+  col.sub = 'gray50',
+  cex.caption = 1,
+  cex.oma.main = 1.25,
+  yaxt = 'n'
+)
+axis(2, col = 'gray75', col.axis = 'gray33')
+axis(1, col = 'gray75', col.axis = 'gray33')
+```
+
+
+```{r}
+
+# si può togliere
+par(mfrow=c(2,2))
+
+plot(
+  lm,
+  which = 1,
+  bty = 'n',
+  pch = 19,
+  col = scales::alpha('#D55E00', .1),
+  #col.smooth = '#56B4E9',
+  lwd = 1,
+  cex =.95,
+  col.lab = 'gray25',
+  col.axis = 'gray50',
+  col.sub = 'gray50',
+  cex.caption = 1,
+  cex.oma.main = 1.25,
+  yaxt = 'n'
+)
+axis(2, col = 'gray75', col.axis = 'gray33')
+axis(1, col = 'gray75', col.axis = 'gray33')
+
+plot(
+  lm,
+  which = 2,
+  bty = 'n',
+  pch = 19,
+  col = scales::alpha('#D55E00', .1),
+  #col.smooth = '#56B4E9',
+  lwd = 1,
+  cex =.95,
+  col.lab = 'gray25',
+  col.axis = 'gray50',
+  col.sub = 'gray50',
+  cex.caption = 1,
+  cex.oma.main = 1.25,
+  yaxt = 'n'
+)
+axis(2, col = 'gray75', col.axis = 'gray33')
+axis(1, col = 'gray75', col.axis = 'gray33')
+
+plot(
+  lm,
+  which = 3,
+  bty = 'n',
+  pch = 19,
+  col = scales::alpha('#D55E00', .1),
+  #col.smooth = '#56B4E9',
+  lwd = 1,
+  cex =.95,
+  col.lab = 'gray25',
+  col.axis = 'gray50',
+  col.sub = 'gray50',
+  cex.caption = 1,
+  cex.oma.main = 1.25,
+  yaxt = 'n'
+)
+axis(2, col = 'gray75', col.axis = 'gray33')
+axis(1, col = 'gray75', col.axis = 'gray33')
+
+plot(
+  lm,
+  which = 4,
+  bty = 'n',
+  pch = 19,
+  col = scales::alpha('#D55E00', .1),
+  #col.smooth = '#56B4E9',
+  lwd = 1,
+  cex =.95,
+  col.lab = 'gray25',
+  col.axis = 'gray50',
+  col.sub = 'gray50',
+  cex.caption = 1,
+  cex.oma.main = 1.25,
+  yaxt = 'n'
+)
+axis(2, col = 'gray75', col.axis = 'gray33')
+axis(1, col = 'gray75', col.axis = 'gray33')
+```
+
+
 
 ```{r}
 # Look the histograms of price and km
@@ -91,8 +223,12 @@ train$log_price <- log(train$Price)
 ```{r}
 # Look the histograms of log_price and log_km
 par(mfrow=c(1,2))
-hist(train$log_price, probability=TRUE, breaks=15)
-#hist(train$log_km, probability=TRUE, breaks=15)
+ggplot(train, aes(x = log_price)) + 
+  geom_histogram(aes(y = ..density..),
+                 colour = 1, fill = "white") +
+  geom_density(lwd = 1, colour = 4,
+               fill = 4, alpha = 0.25) +
+  xlab("Log Price") + ylab("Density")
 ```
 
 Fit the model with logarithm of price:
@@ -118,8 +254,30 @@ AIC(lm1)
 ```{r}
 library(MASS) # for hist.scott
 par(mfrow=c(1,1))
-plot(train$log_price, lm1$residuals)
-plot(lm1$residuals)
+
+ggplot(data=train,aes(x = log_price, y = lm1$residuals)) +
+  geom_point(alpha = .25, color = '#D55E00') +
+  labs(x = 'Log Price', y = "Residuals", title = 'Fitted vs. Residuals') +
+  theme(title = element_text(colour = '#585858'))
+
+ggplot(data=train,aes(x = c(1:nrow(train)), y = lm1$residuals)) +
+  geom_point(alpha = .25, color = '#D55E00') +
+  labs(x = "",y = 'Residuals', title = 'Residuals') +
+  theme(title = element_text(colour = '#585858'))
+
+ggplot(train, aes(x = lm1$residuals)) + 
+  geom_histogram(aes(y = ..density..),
+                 colour = 1, fill = "white") +
+  geom_density(lwd = 1, colour = 4,
+                 alpha = 0.2) +
+  xlab("Log Price") + ylab("Density")  +
+stat_function(fun = dnorm, 
+              args = list(mean = 0, sd = sd(lm1$residual)),
+              colour =2,
+              lwd = 1,
+              alpha = 1)
+
+# questo si può togliere
 hist.scott(lm1$residuals, freq = F)
 curve(dnorm(x,0,sd(lm1$residuals)), add=T, col=2)
 ```
@@ -128,8 +286,102 @@ Also the residual plot is better.
 
 ```{r}
 par(mfrow=c(2,2))
-plot(lm1)
+
+plot(
+  lm1,
+  which = 1,
+  bty = 'n',
+  pch = 19,
+  col = scales::alpha('#D55E00', .1),
+  #col.smooth = '#56B4E9',
+  lwd = 1,
+  cex =.95,
+  col.lab = 'gray25',
+  col.axis = 'gray50',
+  col.sub = 'gray50',
+  cex.caption = 1,
+  cex.oma.main = 1.25,
+  yaxt = 'n'
+)
+axis(2, col = 'gray75', col.axis = 'gray33')
+axis(1, col = 'gray75', col.axis = 'gray33')
+
+plot(
+  lm1,
+  which = 2,
+  bty = 'n',
+  pch = 19,
+  col = scales::alpha('#D55E00', .1),
+  #col.smooth = '#56B4E9',
+  lwd = 1,
+  cex =.95,
+  col.lab = 'gray25',
+  col.axis = 'gray50',
+  col.sub = 'gray50',
+  cex.caption = 1,
+  cex.oma.main = 1.25,
+  yaxt = 'n'
+)
+axis(2, col = 'gray75', col.axis = 'gray33')
+axis(1, col = 'gray75', col.axis = 'gray33')
+
+plot(
+  lm1,
+  which = 3,
+  bty = 'n',
+  pch = 19,
+  col = scales::alpha('#D55E00', .1),
+  #col.smooth = '#56B4E9',
+  lwd = 1,
+  cex =.95,
+  col.lab = 'gray25',
+  col.axis = 'gray50',
+  col.sub = 'gray50',
+  cex.caption = 1,
+  cex.oma.main = 1.25,
+  yaxt = 'n'
+)
+axis(2, col = 'gray75', col.axis = 'gray33')
+axis(1, col = 'gray75', col.axis = 'gray33')
+
+plot(
+  lm1,
+  which = 4,
+  bty = 'n',
+  pch = 19,
+  col = scales::alpha('#D55E00', .1),
+  #col.smooth = '#56B4E9',
+  lwd = 1,
+  cex =.95,
+  col.lab = 'gray25',
+  col.axis = 'gray50',
+  col.sub = 'gray50',
+  cex.caption = 1,
+  cex.oma.main = 1.25,
+  yaxt = 'n'
+)
+axis(2, col = 'gray75', col.axis = 'gray33')
+axis(1, col = 'gray75', col.axis = 'gray33')
 ```
+
+```{r}
+par(mfrow=c(2,2))
+plot(lm1,
+     bty = 'n',
+  pch = 19,
+  col = scales::alpha('#D55E00', .1),
+  #col.smooth = '#56B4E9',
+  lwd = 1,
+  cex =.95,
+  col.lab = 'gray25',
+  col.axis = 'gray50',
+  col.sub = 'gray50',
+  cex.caption = 1,
+  cex.oma.main = 1.25,
+  yaxt = 'n')
+```
+
+
 
 In the normal Q-Q plot we can see that there are heavy tails.
 
@@ -158,11 +410,27 @@ anova(lm_pwr,lm1)
 
 
 ```{r}
-par(mfrow=c(1,1))
-plot(train$log_price, lm_pwr$residuals)
-plot(lm_pwr$residuals)
-hist.scott(lm_pwr$residuals, freq = F)
-curve(dnorm(x,0,sd(lm_pwr$residuals)), add=T, col=2)
+ggplot(data=train,aes(x = log_price, y = lm_pwr$residuals)) +
+  geom_point(alpha = .25, color = '#D55E00') +
+  labs(x = 'Log Price', y = "Residuals", title = 'Log Price vs. Residuals') +
+  theme(title = element_text(colour = '#585858'))
+
+ggplot(data=train,aes(x = c(1:nrow(train)), y = lm_pwr$residuals)) +
+  geom_point(alpha = .25, color = '#D55E00') +
+  labs(x = "",y = 'Residuals', title = 'Residuals') +
+  theme(title = element_text(colour = '#585858'))
+
+ggplot(train, aes(x = lm_pwr$residuals)) + 
+  geom_histogram(aes(y = ..density..),
+                 colour = 1, fill = "white") +
+  geom_density(lwd = 1, colour = 4,
+                 alpha = 0.2) +
+  xlab("Log Price") + ylab("Density")  +
+stat_function(fun = dnorm, 
+              args = list(mean = 0, sd = sd(lm1$residual)),
+              colour =2,
+              lwd = 1,
+              alpha = 1)
 ```
 
 ```{r}
@@ -171,6 +439,20 @@ plot(d,main='Residuals Plot',xlab='Residual value')
 ```
 The tails are not perfect but not so bad.
 
+Let's plot "fitted vs true value"
+```{r}
+ggplot(data=train,aes(x = predict(lm_pwr), y = log_price)) +
+  geom_point(alpha = .25, color = '#D55E00') +
+  labs(x = 'Log Price', y = "Residuals", title = 'Log Price vs. Residuals') +
+  theme(title = element_text(colour = '#585858'))
+```
+```{r}
+ggplot(data=train,aes(x = seq(nrow(train)), y = log_price)) +
+  geom_point(alpha = .5, color = '#D55E00') +
+  geom_point(aes(x = seq(nrow(train)), y = predict(lm_pwr) ), color = '#53004B', alpha=.5) +
+  xlab("") + ylab("") +
+  theme(title = element_text(colour = '#585858'))
+```
 
 
 ```{r}
@@ -203,7 +485,7 @@ Let's try with lasso regression:
 
 ```{r}
 library(glmnet)
-xx <- model.matrix(log_price~.-log_price-Price, data=train)
+xx <- model.matrix(log_price~.-log_price-Price-Engine-Torque, data=train)
 fit.lasso <- glmnet(xx,train$log_price, alpha=1) # alpha=1 selects lasso
 plot(fit.lasso,"lambda")
 ```
@@ -211,7 +493,7 @@ plot(fit.lasso,"lambda")
 
 ```{r}
 set.seed(1)
-cv_model <- cv.glmnet(xx, train$log_price-Engine-Torque, alpha = 1)
+cv_model <- cv.glmnet(xx, train$log_price, alpha = 1)
 plot(cv_model)
 
 best_lambda <- cv_model$lambda.1se
@@ -328,28 +610,5 @@ anova(lm5,lm3)
 
 # We can see that the p-value is low so lm3 is better than lm5, this means that Length is significant
 ```
-Just do the test on the  test set with lm4 (withou ENgine, Torque, Seller Typ and Drive Train):
 
-```{r}
-summary(lm4)
-test$log_price <- log(test$Price)
-predicted_test <- predict(lm4, newdata = test)
-plot(predicted_test, test$log_price)
-#plot(exp(predicted_test), exp(test$log_price))
-abline(a=0, b=1, col=2,lwd=2)
-#rmse <- sqrt(sum((exp(predicted_test) - test$log_price)^2)/length(test$log_price))
-#c(RMSE = rmse, R2=summary(lm4)$r.squared)
-```
-
-```{r}
-#print(sort(predicted_test-test$log_price))
-```
-
-Model 4 with interactions:
-```{r}
-lm4_interactions <- lm(log_price ~ as.factor(Make)+Year+Kilometer+as.factor(Fuel.Type)+as.factor(Transmission)+
-         as.factor(Owner)+Power+Length+Width+Height+as.factor(SeatingCapacity)
-         +TankCapacity+Year:Kilometer, data=train)
-summary(lm4_interactions)
-```
 
