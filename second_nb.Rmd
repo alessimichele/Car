@@ -80,20 +80,23 @@ hist.scott(sqrt(car$km[-c(km_outliers,1767)]),prob = F)
 
 
 
+```{r}
+scores <- data.frame(model=NA,aic=NA,null.dev=NA,res.dev=NA)
+```
+
+
+
 
 # The (mis)fits
 
 
-```{r}
-## build a model matrix
-xx <- model.matrix(Price~.-Price,data=train)
-```
 
 
 We fit a glm with Gamma(log). The choice for a Gamma is justified by the fact that prices are always positive and from the inspection of price vs years it appears that higher prices have larger variance. 
 ```{r}
 glm_full <- glm(Price~.,data=train,family=Gamma(link="log"))
 summary(glm_full)
+scores <- cbind("full",summary(glm_full)$aic,summary(glm_full)$null.deviance,summary(glm_full)$deviance)
 
 qn <- qqnorm(residuals(glm_full,"pearson")/sqrt(0.04303429),col=2) ## qqplot with dispersion param normalisation
 plot(glm_full,which=2) ## qqplot
@@ -108,6 +111,7 @@ abline(a=0,b=1,col=2)
 ```{r}
 glm_reduced_make <- glm(Price~.-Seller.Type-Engine-Torque-Drivetrain,data=train,family = Gamma(link="log"))
 summary(glm_reduced_make)
+scores <- rbind(scores,cbind("reduced",summary(glm_reduced_make)$aic,summary(glm_reduced_make)$null.deviance,summary(glm_reduced_make)$deviance))
 
 qn_r <- qqnorm(residuals(glm_reduced_make,"pearson")/sqrt(0.04303429),col=2) ## qqplot with dispersion param normalisation
 plot(glm_reduced_make) ## qqplot
@@ -116,6 +120,15 @@ points(qn_r$x,qn_r$y,col=alpha(2,0.4),pch=20)
 plot(predict(glm_reduced_make,newdata = test,type="link"),log(test$Price))
 abline(a=0,b=1,col=2)
 ```
+
+
+```{r}
+library(car)
+vif(glm_reduced_make)
+
+```
+
+
 ```{r}
 #par(mfrow=c(4,4))
 for(col in colnames(train)){
@@ -134,14 +147,10 @@ plot(residuals(glm_reduced_make,"pearson"))
 ```{r}
 glm_gauss_reduced_make <- glm(Price~.-Seller.Type-Engine-Torque-Drivetrain,data=train,family = gaussian(link="log"))
 summary(glm_gauss_reduced_make)
+scores <- rbind(scores,cbind("gauss",summary(glm_gauss_reduced_make)$aic,summary(glm_gauss_reduced_make)$null.deviance,summary(glm_gauss_reduced_make)$deviance))
 plot(glm_gauss_reduced_make)
 ```
 
-
-
-```{r}
-stepAIC(glm_full)
-```
 
 
 
@@ -164,25 +173,51 @@ pchisq(chi2,length(dici),lower.tail = F)
 ```{r}
 glm_no_make <- glm(Price~.-Make,data=train,family=Gamma(link="log"))
 summary(glm_no_make)
+scores <- rbind(scores,cbind("no make",summary(glm_no_make)$aic,summary(glm_no_make)$null.deviance,summary(glm_no_make)$deviance))
 plot(glm_no_make)
 ```
 
 ## Lasso
 ```{r}
-set.seed(NULL)
+## build a model matrix
+xx <- model.matrix(Price~.-Price,data=train)
+```
+
+```{r}
+set.seed(1)
 
 
 glm_lasso_cv <- cv.glmnet(xx,train$Price,alpha=1,family=Gamma(link="log"))
 plot(glm_lasso_cv)
 glm_lasso <- glmnet(xx,train$Price,alpha=1,family=Gamma(link="log"),lambda = glm_lasso_cv$lambda.1se)
-#glmnet:::deviance.glmnet(glm_lasso) + 2*(glm_lasso$df + 1)
+#l0 <- logLik(glm(Price~1,data=train,family=Gamma("log")))
+#2*(glmnet:::deviance.glmnet(glm_lasso)-glm_lasso$nulldev) + 2*(glm_lasso$df + 1)-24512*2
 coef.glmnet(glm_lasso)
+scores <- rbind(scores,cbind("lasso",NA,glm_lasso$nulldev,(1-glm_lasso$dev.ratio)*glm_lasso$nulldev ))
 glm_lasso
 ```
+
+### compute mare scores
+```{r}
+scores <- data.frame(scores)
+scores$mare[1] <- sum(abs(predict(glm_full,newdata =  test,type="response")-test$Price)/test$Price)/nrow(test)
+scores$mare[2] <- sum(abs(predict(glm_reduced_make,newdata =  test,type="response")-test$Price)/test$Price)/nrow(test)
+scores$mare[3] <-sum(abs(predict(glm_gauss_reduced_make,newdata =  test,type="response")-test$Price)/test$Price)/nrow(test)
+scores$mare[4] <-sum(abs(predict(glm_no_make,newdata =  test,type="response")-test$Price)/test$Price)/nrow(test)
+scores$mare[5] <-sum(abs(predict(glm_lasso,newx = xx_test,type="response")-test$Price)/test$Price)/nrow(test)
+colnames(scores) <- c("model","aic","null.dev","dev","mare")
+```
+
+
+
+```{r}
+assess.glmnet(glm_lasso,newx = xx_test,newy=test$Price,family=Gamma("log"))
+```
+
 ```{r}
 
 xx_test <- model.matrix(Price~.,data=test)
-plot(predict(glm_lasso,newx = xx_test,type="link"),log(test$Price))
+plot(predict.glmnet(glm_lasso,newx = xx_test,type="response"),test$Price)
 abline(a=0,b=1,col=2)
 ```
 
