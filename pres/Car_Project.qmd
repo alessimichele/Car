@@ -1,0 +1,85 @@
+---
+title: "Car Project"
+format: revealjs
+editor: visual
+---
+
+## Quarto
+
+This is a trial for a possible presentation for our project.
+
+## Bullets
+
+When you click the **Render** button a document will be generated that includes:
+
+-   Content authored with markdown
+-   Output from executable code
+
+## Data Analysis
+
+When you click the **Render** button a presentation will be generated that includes both content and the output of embedded code. You can embed code like this:
+
+```{r}
+library(ggplot2)
+car <- read.csv("./car.csv")
+# Remove observation 1080
+car <- car[car$Kilometer != 2000.000,]
+```
+
+## Data Exploration
+
+Let's do something.
+
+```{r}
+ggplot(car, aes(x=Kilometer, y=log(Price) )) +
+  geom_bin2d(bins = 30) +
+  scale_fill_continuous(type = "viridis") +
+  theme_bw()
+```
+
+## Kilometer vs Log Price
+
+```{r}
+ggplot(car[ car$Kilometer < 100 & car$Kilometer >50 & car$Price>exp(13) & car$Price< exp(15),], aes(x=Kilometer, y=log(Price), size = Engine, color = Fuel.Type)) +
+    geom_point(alpha=0.5) +
+  scale_size(range = c(.2, 7), name="Engine")
+```
+
+## Linear Model
+
+First, we split our data into train and test set.
+
+```{r}
+set.seed(1)
+index <- sample(nrow(car), nrow(car)*0.8, replace=F)
+train <- car[index,]
+test <- car[-index,]
+```
+
+Then fit the first model:
+
+```{r}
+lm <- lm(Price ~ as.factor(Make)+Year+Kilometer+as.factor(Fuel.Type)+as.factor(Transmission)+
+         as.factor(Owner)+as.factor(Seller.Type)+Engine+Power+Torque+
+         as.factor(Drivetrain)+Length+Width+Height+as.factor(SeatingCapacity)
+         +TankCapacity, data=train)
+summary(lm)
+```
+
+## R squared
+
+```{r, echo=F}
+summary(lm)$adj.r.squared
+
+```
+
+## Plot Fitted vs Observed
+
+```{r, echo=F}
+ggplot(data=train,aes(x = Price, y =  lm$residuals)) +
+  geom_point(alpha = .25, color = '#D55E00') +
+  geom_smooth(color = '#56B4E9', se = F) +
+  labs(x = 'Price', y = 'Residuals', title = 'Fitted vs. Observed') +
+  #hrbrthemes::theme_ipsum_rc() +
+  theme(title = element_text(colour = 'black'))
+```

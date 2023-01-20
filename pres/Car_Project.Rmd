@@ -2,11 +2,11 @@
 title: "Linear Models"
 author: "Elena Rivaroli"
 date: "2023-01-19"
-output: html_document
+output: powerpoint_presentation
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = FALSE)
 ```
 
 ```{r}
@@ -15,7 +15,7 @@ library(ggplot2)
 
 Import the dataset:
 
-```{r cars}
+```{r}
 car <- read.csv("./car.csv")
 # Remove observation 1080
 car <- car[car$Kilometer != 2000.000,]
@@ -39,56 +39,11 @@ ggplot(car[ car$Kilometer < 100 & car$Kilometer >50 & car$Price>exp(13) & car$Pr
   scale_size(range = c(.2, 7), name="Engine")
 ```
 
-```{r}
-# Charge libraries:
-library(ggplot2)
-library(gganimate)
-library(gifski)
- 
-# Make a ggplot, but add frame=year: one image per year
-myPlot <- ggplot(car, aes(Kilometer, log(Price))) +
-  geom_point(alpha = 0.5, show.legend = FALSE) +
-  
-  scale_x_log10() +
-  facet_wrap(~Fuel.Type) +
-  # Here comes the gganimate specific bits
-  labs(title = 'Year: {frame_time}', x = 'Kilometer', y = 'Price') +
-  transition_time(Year) +
-  ease_aes('linear')
 
-# Save at gif:
-
-
-animate(myPlot, duration = 16, fps = 30, width = 200, height = 200, renderer = gifski_renderer())
-anim_save("output.gif")
-```
-
-```{r}
-library(ggplot2)
-library(gganimate)
-library(dplyr)
-
-
-# Keep only 3 names
-don <- car %>% 
-  filter(Fuel.Type %in% c("Diesel", "Petrol", "Other"))
-  
-# Plot
-myPlot <- don %>%
-  ggplot( aes(x=Year, y=log(Price), group=Fuel.Type, color=Fuel.Type)) +
-    geom_line() +
-    geom_point() +
-    ggtitle("Selling Price wrt Fuel Type") +
-    ylab("Log Price") +
-    transition_reveal(Year)
-
-animate(myPlot, duration = 10, fps = 40, width = 200, height = 200, renderer = gifski_renderer())
-anim_save("output1.gif")
-```
 
 
 # Linear Model
-```{r cars}
+```{r}
 set.seed(1)
 index <- sample(nrow(car), nrow(car)*0.8, replace=F)
 train <- car[index,]
