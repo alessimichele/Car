@@ -1,0 +1,230 @@
+---
+title: "Second: data v4"
+output: html_notebook
+---
+
+
+```{r}
+library(ggplot2)
+library(GGally)
+library(stringr)
+library(plotly)
+library(MASS)
+library(glmnet)
+```
+
+
+```{r}
+cor_mat <- round(cor(car[,unlist(lapply(car, is.numeric), use.names = FALSE)]),2)
+data<-expand.grid(X=unlist(dimnames(cor_mat)[2]),Y=unlist(dimnames(cor_mat)[2]))
+data$Z<- c(cor_mat)
+
+ggplot(data,aes(X,Y,fill=Z))+geom_tile()+theme(axis.text.x=element_text(angle = -90, hjust = 0))+coord_equal()+scale_y_discrete(limits=rev)+geom_text(aes(label=prettyNum(Z,digits=2,format="f")), color="white", size=4)
+```
+
+
+
+
+```{r}
+car<-read.csv("data/car_pulito.csv")
+
+# Transform categorical variables into factors
+car$make <- as.factor(car$make)
+car$fuel <- as.factor(car$fuel)
+car$transmission <- as.factor(car$transmission)
+car$owner <- as.factor(car$owner)
+car$seller<- as.factor(car$seller)
+car$drivetrain <- as.factor(car$drivetrain)
+car$seats <- as.factor(car$seats)
+car$km <- car$km/1000 #kilometers are in thousands
+
+colnames(car)
+```
+
+
+
+
+
+
+
+```{r}
+## Price distribution
+
+par(mfrow=c(2,2))
+price_outliers <- which(car$price> quantile(car$Price,0.99))
+boxplot(car$rice[-price_outliers])
+hist.scott(car$price[-price_outliers],prob = F)
+boxplot(log(car$price[-price_outliers]))
+hist.scott(log(car$price[-price_outliers]),prob = F)
+```
+
+```{r}
+temp <- ndf[price_outliers,]
+```
+
+```{r}
+## Kilometers distribution
+
+par(mfrow=c(2,2))
+km_outliers <- which(car$km> quantile(car$km,0.9999))
+boxplot(car$km[-km_outliers])
+hist.scott(car$km[-km_outliers],prob = F)
+boxplot(sqrt(car$km[-km_outliers]))
+hist.scott(sqrt(car$km[-c(km_outliers,1767)]),prob = F)
+```
+
+
+# The (mis)fits
+
+
+```{r}
+## build a model matrix
+xx <- model.matrix(price~.-price,data=car)
+```
+
+
+
+```{r}
+glm_full <- glm(price~.,data=car,family=Gamma(link="log"))
+summary(glm_full)
+
+glm_reduced_make <- glm(price~.-seller-engine-torque-drivetrain,data=car,family = Gamma(link="log"))
+summary(glm_reduced_make)
+```
+
+```{r}
+stepAIC(glm_full)
+```
+
+
+
+
+### histogram of residuals
+```{r}
+myhist<-hist.scott(residuals(glm_full,"pearson")/sqrt(0.04377756),prob=F,col=alpha(7,0.4))
+p<-dnorm(myhist$mids,0,1)*0.2
+sd<-sqrt(length(residuals(glm_full))*p*(1-p))
+points(myhist$mids,length(residuals(glm_full))*p,pch=20,col=4)
+segments(myhist$mids,length(residuals(glm_full))*p-sd,myhist$mids,length(residuals(glm_full))*p+sd,col=4)
+```
+
+
+```{r}
+glm_no_make <- glm(price~.-make,data=car,family=Gamma(link="log"))
+summary(glm_no_make)
+#plot(glm_no_make)
+```
+
+## Lasso
+```{r}
+set.seed(NULL)
+
+
+glm_lasso_cv <- cv.glmnet(xx,car$price,alpha=1,family=Gamma(link="log"))
+plot(glm_lasso_cv)
+glm_lasso <- glmnet(xx,car$price,alpha=1,family=Gamma(link="log"),lambda = glm_lasso_cv$lambda.1se)
+glmnet:::deviance.glmnet(glm_lasso) + 2*(glm_lasso$df + 1)
+coef.glmnet(glm_lasso)
+```
+
+
+
+```{r}
+xx_nm <- model.matrix(price~.-price-make,data=car)
+
+glm_lasso_cv_nm <- cv.glmnet(xx_nm,car$price,alpha=1,family=Gamma(link="log"))
+plot(glm_lasso_cv_nm)
+glm_lasso_nm <- glmnet(xx_nm,car$price,alpha=1,family=Gamma(link="log"),lambda = glm_lasso_cv_nm$lambda.1se)
+glmnet:::deviance.glmnet(glm_lasso_nm) + 2*(glm_lasso_nm$df + 1)
+coef.glmnet(glm_lasso_nm)
+```
+
+
+## Ridge ?
+```{r}
+set.seed(1)
+xx <- model.matrix(Price~.-Price,data=car)
+
+glm_ridge_cv <- cv.glmnet(xx,car$Price,alpha=0,family=Gamma(link="log"))
+plot(glm_ridge_cv)
+glm_ridge <- glmnet(xx,car$Price,alpha=0,family=Gamma(link="log"),lambda = glm_ridge_cv$lambda.1se)
+glmnet:::deviance.glmnet(glm_ridge) + 2*(glm_ridge$df + 1)
+glm_ridge
+```
+
+
+
+
+
+
+```{r}
+library(boot)
+dia <- glm.diag(glm_no_make)
+glm.diag.plots(glm_no_make,dia)
+```
+
+
+
+```{r}
+with(car, plot(Price~log(Kilometer),xlim=c(6,12)))
+points(y=predict(glm_lasso,newx=xx,type="response"),x=log(car$Kilometer),col=2)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+```{r}
+library(cluster)
+vars<-ndf[,c(3,12,13,14)]
+#ndf1<-daisy(ndf[,unlist(lapply(ndf, is.numeric), use.names = FALSE)],metric = 'gower')
+cars_dend_ward<-agnes(vars,stand = FALSE, metric = "euclidean", method = "ward")
+pltree(cars_dend_ward, cex=0.5, hang = -1, main = "Metodo ward", xlab="", sub ="")
+print(paste("agglomerative coefficient ward method",cars_dend_ward$ac))
+ 
+
+cars_diss_matrix <- daisy(ndf[,unlist(lapply(ndf, is.numeric), use.names = FALSE)],metric="euclidean")
+
+SIL <- sapply(2:10,function(i){ mean(silhouette(cutree(cars_dend_ward,i),cars_diss_matrix)[,3])})
+plot(c(0,SIL),type="b",ylab = "Silhouette",xlab = "number of cluster",pch=19,col=3, main = "Silhouette vs number of clusters")
+
+```
+
+```{r}
+cars_dis <- daisy(vars,metric='euclidean')
+
+cars_pam_3<-pam(cars_dis,2,stand = T,metric = "euclidean")
+print(paste("average width k=3:",cars_pam_3$silinfo$avg.width))
+plot(cars_pam_3,which=2, main = "", cex.main=0.8)
+t<-table(cars_pam_3$clustering)
+row.names(t)<-c("cluster_1","cluster_2")
+
+
+
+
+vars$clusters <- cars_pam_3$clustering
+
+for(i in seq(1,4)){
+  
+print(ggplot(vars,aes(x=clusters,y=vars[,i],fill=as.factor(clusters)))+geom_boxplot(outlier.shape = NA) +  ggtitle(names(vars)[i]) + xlab("") + ylab(names(vars)[i]))
+  
+}
+
+```
+```{r}
+ggplot(data=car,aes(x=Make,y=log(Price)))+geom_boxplot()+theme(axis.text.x=element_text(angle = -90, hjust = 0))
+
+```
+```{r}
+ggplot(car,aes(x=factor(Year),y=log(Price)))+geom_boxplot()
+```
+
