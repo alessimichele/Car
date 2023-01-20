@@ -41,7 +41,7 @@ car$SeatingCapacity <- as.factor(car$SeatingCapacity)
 car <- car[car$Kilometer != 2000,]
 
 set.seed(1)
-index <- sample(nrow(car)*0.8,replace = F)
+index <- sample(nrow(car),nrow(car)*0.8,replace = F)
 train <- car[index,]
 test <- car[-index,]
 ```
@@ -110,12 +110,34 @@ glm_reduced_make <- glm(Price~.-Seller.Type-Engine-Torque-Drivetrain,data=train,
 summary(glm_reduced_make)
 
 qn_r <- qqnorm(residuals(glm_reduced_make,"pearson")/sqrt(0.04303429),col=2) ## qqplot with dispersion param normalisation
-plot(glm_reduced_make,which=2) ## qqplot
+plot(glm_reduced_make) ## qqplot
 points(qn_r$x,qn_r$y,col=alpha(2,0.4),pch=20)
 
-plot(predict(glm_reduced_make,newdata = test,type="response"),test$Price)
+plot(predict(glm_reduced_make,newdata = test,type="link"),log(test$Price))
 abline(a=0,b=1,col=2)
 ```
+```{r}
+#par(mfrow=c(4,4))
+for(col in colnames(train)){
+  plot(train[,col],residuals(glm_reduced_make,"pearson"),main=paste(col))
+}
+
+large.res <- which(abs(residuals(glm_reduced_make,"pearson"))>0.5)
+poorly.pred <- train[large.res,]
+```
+
+```{r}
+plot(residuals(glm_reduced_make,"pearson"))
+```
+
+
+```{r}
+glm_gauss_reduced_make <- glm(Price~.-Seller.Type-Engine-Torque-Drivetrain,data=train,family = gaussian(link="log"))
+summary(glm_gauss_reduced_make)
+plot(glm_gauss_reduced_make)
+```
+
+
 
 ```{r}
 stepAIC(glm_full)
@@ -127,17 +149,22 @@ stepAIC(glm_full)
 ### histogram of residuals
 ```{r}
 myhist<-hist.scott(residuals(glm_full,"pearson")/sqrt(0.04303429),prob=F,col=alpha(7,0.4))
+n <- length(residuals(glm_full))
 p<-dnorm(myhist$mids,0,1)*0.5
-sd<-sqrt(length(residuals(glm_full))*p*(1-p))
-points(myhist$mids,length(residuals(glm_full))*p,pch=20,col=4)
-segments(myhist$mids,length(residuals(glm_full))*p-sd,myhist$mids,length(residuals(glm_full))*p+sd,col=4)
+sd<-sqrt(n*p*(1-p))
+points(myhist$mids,n*p,pch=20,col=4)
+segments(myhist$mids,n*p-sd,myhist$mids,n*p+sd,col=4)
+
+dici <- which(myhist$counts >= 30)
+chi2 <- sum((myhist$counts[dici]-n*p[dici])^2/sd[dici]^2)
+pchisq(chi2,length(dici),lower.tail = F)
 ```
 
 
 ```{r}
-glm_no_make <- glm(price~.-make,data=car,family=Gamma(link="log"))
+glm_no_make <- glm(Price~.-Make,data=train,family=Gamma(link="log"))
 summary(glm_no_make)
-#plot(glm_no_make)
+plot(glm_no_make)
 ```
 
 ## Lasso
