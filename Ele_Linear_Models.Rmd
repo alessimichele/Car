@@ -13,25 +13,32 @@ Import the dataset:
 
 ```{r cars}
 car <- read.csv("./car.csv")
+# Remove observation 1080
+car <- car[car$Kilometer != 2000.000,]
 
-library(dplyr)
+#library(dplyr)
 #make this example reproducible
 set.seed(1)
 # shuffle the dataframe by rows
-car= car[sample(1:nrow(car)), ]
-
-#make this example reproducible
-set.seed(1)
+#car= car[sample(1:nrow(car)), ]
 
 #create ID column
-car$id <- 1:nrow(car)
+#car$id <- 1:nrow(car)
 
 #use 80% of dataset as training set and 20% as test set
-train <- car %>% dplyr::sample_frac(0.80)
-test <- dplyr::anti_join(car, train, by = 'id')
+#train <- car %>% dplyr::sample_frac(0.80)
+#test <- dplyr::anti_join(car, train, by = 'id')
 
-train <- train[, -19]
-test <- test[, -19]
+#train <- train[, -18]
+#test <- test[, -18]
+index <- sample(nrow(car), nrow(car)*0.8, replace=F)
+train <- car[index,]
+test <- car[-index,]
+
+```
+
+```{r}
+nrow(train)+nrow(test)==nrow(car)
 ```
 
 Fit a simple linear model with all the covariates:
@@ -63,7 +70,6 @@ Let's see the residuals plot:
 # Plot the residuals and the fitted values.
 par(mfrow=c(2,2))
 plot(lm)
-
 ```
 
 ```{r}
@@ -88,7 +94,8 @@ par(mfrow=c(1,2))
 hist(train$log_price, probability=TRUE, breaks=15)
 #hist(train$log_km, probability=TRUE, breaks=15)
 ```
-Fit the model with logarithm of price and km:
+
+Fit the model with logarithm of price:
 
 ```{r}
 lm1 <- lm(log_price ~ as.factor(Make)+Year+Kilometer+as.factor(Fuel.Type)+as.factor(Transmission)+
@@ -129,6 +136,7 @@ In the normal Q-Q plot we can see that there are heavy tails.
 We can try to remove engine and torque, which are very positive correlated with power.
 Power is the only significant variable among these three.
 
+
 ```{r}
 lm_pwr <- lm(log_price ~ as.factor(Make)+Year+Kilometer+as.factor(Fuel.Type)+as.factor(Transmission)+
          as.factor(Owner)+as.factor(Seller.Type)+Power+
@@ -142,6 +150,14 @@ summary(lm_pwr)
   - F-statistic: 670.1
 
 ```{r}
+AIC(lm_pwr)
+```
+```{r}
+anova(lm_pwr,lm1)
+```
+
+
+```{r}
 par(mfrow=c(1,1))
 plot(train$log_price, lm_pwr$residuals)
 plot(lm_pwr$residuals)
@@ -153,7 +169,7 @@ curve(dnorm(x,0,sd(lm_pwr$residuals)), add=T, col=2)
 d<-density(lm_pwr[['residuals']])
 plot(d,main='Residuals Plot',xlab='Residual value')
 ```
-The tails are not so bad.
+The tails are not perfect but not so bad.
 
 
 
@@ -164,7 +180,7 @@ plot(lm_pwr)
 
 
 From the first plot (residuals vs fitted), we can observe that for lower values of the price, the mean of the residuals is a little bit higher than 0. But it's ok!!
-In the normal Q-Q plot we can see that there are heavy tails (this is to investigate a little bit.
+In the normal Q-Q plot we can see that there are heavy tails (this is to investigate a little bit).
 
 Let's try to plot residuals vs all the covariates.
 ```{r}
@@ -181,9 +197,7 @@ plot(train$Height, lm_pwr$residuals)
 plot(train$TankCapacity, lm_pwr$residuals)
 ```
 There are not particular patterns between residuals and covariates.
-
-
-
+Except in kilometer, where we can see a point with a very high leverage (outlier?).
 
 Let's try with lasso regression:
 
@@ -193,6 +207,7 @@ xx <- model.matrix(log_price~.-log_price-Price-Engine-Torque, data=train)
 fit.lasso <- glmnet(xx,train$log_price, alpha=1) # alpha=1 selects lasso
 plot(fit.lasso,"lambda")
 ```
+
 
 ```{r}
 set.seed(1)
@@ -206,6 +221,7 @@ summary(best_model)
 coef(best_model)
 best_model
 ```
+
 Let's try with ridge regression:
 
 ```{r}
@@ -214,36 +230,42 @@ library(MASS)
 
 lm_ridge<- lm.ridge(log_price ~ as.factor(Make)+Year+Kilometer+as.factor(Fuel.Type)+as.factor(Transmission)+
          as.factor(Owner)+as.factor(Seller.Type)+Power+Engine+Torque+
-         as.factor(Drivetrain)+Lenght+Width+Height+as.factor(SeatingCapacity)
+         as.factor(Drivetrain)+Length+Width+Height+as.factor(SeatingCapacity)
          +TankCapacity, lambda=0, data=train)
 coef(lm_ridge)
 # select lambda by GCV in the model with logLDC
 grid.ridge<-lm.ridge(log_price ~ as.factor(Make)+Year+Kilometer+as.factor(Fuel.Type)+as.factor(Transmission)+
          as.factor(Owner)+as.factor(Seller.Type)+Power+Engine+Torque+
-         as.factor(Drivetrain)+Lenght+Width+Height+as.factor(SeatingCapacity)
+         as.factor(Drivetrain)+Length+Width+Height+as.factor(SeatingCapacity)
          +TankCapacity,lambda=seq(0.1,10,0.001), data=train)
 
 lambda_selected<-grid.ridge$lambda[which(grid.ridge$GCV==min(grid.ridge$GCV))]
 
 lm_ridge_GCV <- lm.ridge(log_price ~ as.factor(Make)+Year+Kilometer+as.factor(Fuel.Type)+as.factor(Transmission)+
          as.factor(Owner)+as.factor(Seller.Type)+Power+Engine+Torque+
-         as.factor(Drivetrain)+Lenght+Width+Height+as.factor(SeatingCapacity)
+         as.factor(Drivetrain)+Length+Width+Height+as.factor(SeatingCapacity)
          +TankCapacity, lambda=lambda_selected, data=train)
 coef(lm_ridge_GCV)
 summary(lm_ridge)
 ```
 
 
-
 Linear model without make:
 
 ```{r}
-lm2 <- lm(log_price ~ as.factor(Make)+Year+Kilometer+as.factor(Fuel.Type)+as.factor(Transmission)+
-         as.factor(Owner)+as.factor(Seller.Type)+Power+Engine+Torque+
-         as.factor(Drivetrain)+Lenght+Width+Height+as.factor(SeatingCapacity)
-         +TankCapacity, data=train)
-summary(lm2)
+lm_noMake <- lm(log_price ~ Year+Kilometer+as.factor(Fuel.Type)+as.factor(Transmission)+
+         as.factor(Owner)+as.factor(Seller.Type)+Power+as.factor(Drivetrain)+
+           Length+Width+Height+as.factor(SeatingCapacity)+TankCapacity, data=train)
+summary(lm_noMake)
 ```
+```{r}
+AIC(lm_noMake)
+```
+
+```{r}
+anova(lm_noMake,lm_pwr)
+```
+
 
 ```{r}
 par(mfrow=c(1,1))
@@ -252,27 +274,26 @@ plot(train$log_price, lm2$residuals)
 
 ```{r}
 par(mfrow=c(2,2))
-plot(lm2)
+plot(lm_noMake)
 ```
+
 
 Let's try to remove by hand not significant variables from the first model (with logarithm):
 
 ```{r}
-summary(lm1)
+summary(lm_pwr)
 ```
 
 We can see that both levels of "seller" are not significant, let's try to remove it
 
 ```{r}
-lm3 <- lm(log_price ~ as.factor(make)+year+log_km+as.factor(fuel)+as.factor(transmission)+
-         as.factor(owner)+engine+power+torque+
-         as.factor(drivetrain)+lenght+width+height+as.factor(seats)
-         +tank, data=train)
+lm3 <- lm(log_price ~ as.factor(Make)+Year+Kilometer+as.factor(Fuel.Type)+as.factor(Transmission)+
+         as.factor(Owner)+Power+as.factor(Drivetrain)+Length+Width+Height+as.factor(SeatingCapacity)
+         +TankCapacity, data=train)
 summary(lm3)
 
 AIC(lm3)
-AIC(lm1)
-anova(lm1,lm3)
+anova(lm3, lm_pwr)
 ```
 Ci piace di più quello ridotto.
 
@@ -284,30 +305,28 @@ plot(lm3)
 Still both levels of "drivetrain" are not significant:
 
 ```{r}
-lm4 <- lm(log_price ~ as.factor(make)+year+log_km+as.factor(fuel)+as.factor(transmission)+
-         as.factor(owner)+engine+power+torque+
-         lenght+width+height+as.factor(seats)
-         +tank, data=train)
+lm4 <- lm(log_price ~ as.factor(Make)+Year+Kilometer+as.factor(Fuel.Type)+as.factor(Transmission)+
+         as.factor(Owner)+Power+Length+Width+Height+as.factor(SeatingCapacity)
+         +TankCapacity, data=train)
 summary(lm4)
 AIC(lm4)
-AIC(lm3)
-AIC(lm1)
-anova(lm1,lm4)
+anova(lm4,lm3)
 ```
 
 ```{r}
 plot(lm4)
 ```
 
+Just to try, I remove a significant covariate, for example "Length" from lm3:
 
+```{r}
+lm5 <- lm(log_price ~ as.factor(Make)+Year+Kilometer+as.factor(Fuel.Type)+as.factor(Transmission)+
+         as.factor(Owner)+Power+as.factor(Drivetrain)+Width+Height+as.factor(SeatingCapacity)
+         +TankCapacity, data=train)
+summary(lm5)
+anova(lm5,lm3)
 
-
-
-
-
-
-
-
-
+# We can see that the p-value is low so lm3 is better than lm5, this means that Length is significant
+```
 
 
