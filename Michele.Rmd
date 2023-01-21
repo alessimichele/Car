@@ -11,9 +11,11 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ```{r}
 library(ggplot2)
+library(plotly)
+library(gridExtra)
 ```
 
-Import the dataset:
+# Import the dataset:
 
 ```{r cars}
 car <- read.csv("./car.csv")
@@ -21,26 +23,192 @@ car <- read.csv("./car.csv")
 car <- car[car$Kilometer != 2000.000,]
 ```
 
+```{r}
+library(skimr)
+skim(car)
+```
+
+# Correlation plot
+```{r}
+cor_mat <- cor(car[,unlist(lapply(car, is.numeric), use.names = FALSE)],use = "complete.obs")
+data<-expand.grid(X=unlist(dimnames(cor_mat)[2]),Y=unlist(dimnames(cor_mat)[2]))
+data$Z<- c(cor_mat)
+
+#ggplot(data,aes(X,Y,fill=Z))+geom_tile()+theme(axis.text.x=element_text(angle = -90, hjust = 0))+coord_equal()+scale_y_discrete(limits=rev)+geom_text(aes(label=prettyNum(Z,digits=2,format="f")), color="white", size=4)
+
+corrplot(cor_mat, type = "upper")
+```
+
+# Log Price vs Make
+```{r}
+car %>%
+  ggplot( aes(x=Make, y=log(Price), fill=Make)) +
+    geom_boxplot() +
+    geom_jitter(color="black", size=0.2, alpha=0.5) +
+    theme(axis.text.x=element_text(angle = -90, hjust = 0)) +
+    ggtitle("Log Price vs Make") + 
+    xlab("") + ylab("Log Price")
+```
+
+# Log Price vs Owner
+```{r}
+library(dplyr)
+car %>%
+  ggplot( aes(x=Owner, y=log(Price), fill=Owner)) +
+    geom_boxplot() +
+    
+    geom_jitter(color="black", size=0.2, alpha=0.5) +
+  
+    ggtitle("Log Price vs Owner") +
+    xlab("")
+```
+
+
+
+# Distribution of categorical variable
+```{r} 
+p12 <- ggplot(car, aes(x=reorder(Make, Make, function(x)-length(x)))) +
+  geom_bar(fill='steelblue') +
+  labs(x='Make')+
+  ggtitle("Distribution of Make")+theme_minimal()+theme(axis.text.x = element_text(angle = 90))
+
+p13 <- ggplot(car, aes(x=reorder(Fuel.Type, Fuel.Type, function(x)-length(x)))) +
+  geom_bar(fill='steelblue') +
+  labs(x='Fuel Type')+
+  ggtitle("Distribution of Fuel Type")+theme_minimal()
+
+p14 <- ggplot(car, aes(x=reorder(Transmission,Transmission, function(x)-length(x)))) +
+  geom_bar(fill='steelblue') +
+  labs(x='Transmission')+
+  ggtitle("Distribution of Transmission")+theme_minimal()
+
+p15 <- ggplot(car, aes(x=reorder(Owner,Owner, function(x)-length(x)))) +
+  geom_bar(fill='steelblue') +
+  labs(x='Owner')+
+  ggtitle("Distribution of Owner")+theme_minimal()
+
+p16 <- ggplot(car, aes(x=reorder(Seller.Type, Seller.Type, function(x)-length(x)))) +
+  geom_bar(fill='steelblue') +
+  labs(x='Seller Type')+
+  ggtitle("Distribution of Seller Type")+theme_minimal()
+
+p17 <- ggplot(car, aes(x=reorder(Drivetrain, Drivetrain, function(x)-length(x)))) +
+  geom_bar(fill='steelblue') +
+  labs(x='Drivetrain')+
+  ggtitle("Distribution of Drivetrain")+theme_minimal()
+
+p18 <- ggplot(car, aes(x=reorder(SeatingCapacity, SeatingCapacity, function(x)-length(x)))) +
+  geom_bar(fill='steelblue') +
+  labs(x='Seating Capacity')+
+  ggtitle("Distribution of Seating Capacity")+theme_minimal()
+
+grid.arrange(p13, p14,p15, p16, p17, p18, ncol=3)
+```
+
+We start to study the relationship of the dependent variable with the other numerical ones
+
+# Price vs numerical variables
+```{r}
+car1 <- car[car$Kilometer !=925.000, ]
+p12 <- ggplot(car, aes(x = Year, y =log(Price))) +
+    geom_point(size=0.7)+
+  ggtitle("Distribution of log(Price) over the years")+ theme_classic()
+
+p13 <-ggplot(car1, aes(x = Kilometer, y =log(Price))) +
+    geom_point(size=0.7)+
+  ggtitle("Distribution of log(Price) vs travelled Kilometer")+ theme_classic() 
+
+p14 <- ggplot(car, aes(x = Engine, y =log(Price))) +
+    geom_point(size=0.7)+
+  ggtitle("Distribution of log(Price) vs Engine")+ theme_classic()
+
+p15 <- ggplot(car, aes(x = Power, y =log(Price))) +
+    geom_point(size=0.7)+
+  ggtitle("Distribution of log(Price) vs Max Power")+ theme_classic()
+
+p16 <- ggplot(car, aes(x = Torque, y =log(Price))) +
+    geom_point(size=0.7)+
+  ggtitle("Distribution of log(Price) vs Max Torque")+ theme_classic()
+
+p17 <- ggplot(car, aes(x = Length, y =log(Price))) +
+    geom_point(size=0.7)+
+  ggtitle("Distribution of log(Price) vs Length")+ theme_classic()
+
+p18 <- ggplot(car, aes(x = Width, y =log(Price))) +
+    geom_point(size=0.7)+
+  ggtitle("Distribution of log(Price) vs Width")+ theme_classic()
+
+p19 <- ggplot(car, aes(x = Height, y =log(Price))) +
+    geom_point(size=0.7)+
+  ggtitle("Distribution of log(Price) vs Height")+ theme_classic()
+
+p20 <- ggplot(car, aes(x = TankCapacity, y =log(Price))) +
+    geom_point(size=0.7)+
+  ggtitle("Distribution of log(Price) vs Fuel Tank Capacity")+ theme_classic()
+
+grid.arrange(p12, p13, p14,p15, p16, p17, p18, p19, p20, ncol=3)
+```
+
+We can observe an increasing trend in price for increasing value of other variables, except for the number of kilometer for whixh a very slow decreasing trend can be spotted. Instead for what concernes dimensions of the car, lenght and height seems to have a posite relationship with car price, but no significant pattern can be spotted in the Price vs Height plot (we can exclude the variable from the model)
+
+
+# Kilometer and logPrice analysis
+From the following scatterplot we can see a very small decreasing trend in the log of Prices as the number of kilometers increases, but most important we can see that, in general, for a similar number of km, older cars (darker points) have a lower price than newer ones (light points) (as expected)
+```{r}
+car1 <- car[car$Kilometer !=925.000, ]
+pl1 <- ggplot(car1, aes(x=Kilometer, y=log(Price)))+
+  geom_point(aes(col=Year))+theme_classic()
+ggplotly(pl1)
+```
+
+same thing can be said for what refers to brand. For two cars having the same number of km, the brand makes a great difference in the log of price (Tata with 60 000km costs 10.79 (da trasformare), while a Rolls-Royce with same number of kilometer costs 16.70)
+
+```{r}
+pl2 <- ggplot(car1, aes(x=Kilometer, y=log(Price)))+
+  geom_point(aes(col=Make))+theme_classic()
+ggplotly(pl2)
+```
+
+
+```{r}
+pl3 <- ggplot(car1, aes(x=Year, y=log(Price)))+
+  geom_point(aes(col=Make))+theme_classic()
+ggplotly(pl3)
+```
+
+We study also correlation of the numerical variables with Price and among themselves
+
+```{r}
+library(corrplot)
+M <- round(cor(car[, c(2, 3, 4, 9:11, 13:15, 17)]),2)
+corrplot(M, method="number", number.cex = 0.7, tl.col = "black")
+
+```
+
+According to the corrplot, I'd delete the Height variable since it'is not correlated with Price and add not a real pattern with log(Price), but I'd lascerei year and km, since they showed a clear trend in the scatter plots. For what concernes correlated features, I'd deleet torque and Engine, since they are highly correlated with Power.
+
 # Esperimento di data visualization
 ```{r}
-# esperimento per data visualization
-
 # capisco dove ci sono piu dati
-ggplot(car, aes(x=Kilometer, y=log(Price) )) +
+p<-ggplot(car, aes(x=Kilometer, y=log(Price) )) +
   geom_bin2d(bins = 30) +
   scale_fill_continuous(type = "viridis") +
   theme_bw()
+
+ggplotly(p)
 ```
+
 
 ```{r}
 # analizzo quella fetta di dati
-ggplot(car[ car$Kilometer < 100 & car$Kilometer >50 & car$Price>exp(13) & car$Price< exp(15),], aes(x=Kilometer, y=log(Price), size = Engine, color = Fuel.Type)) +
+p<-ggplot(car[ car$Kilometer < 100 & car$Kilometer >50 & car$Price>exp(13) & car$Price< exp(15),], aes(x=Kilometer, y=log(Price), size = Engine, color = Fuel.Type)) +
     geom_point(alpha=0.5) +
   scale_size(range = c(.2, 7), name="Engine")
+ggplotly(p)
 ```
 
 
-```{r}
+```
 # Charge libraries:
 library(ggplot2)
 library(gganimate)
@@ -62,9 +230,7 @@ myPlot <- ggplot(car, aes(Kilometer, log(Price))) +
 
 animate(myPlot, duration = 16, fps = 30, width = 200, height = 200, renderer = gifski_renderer())
 anim_save("output.gif")
-```
 
-```{r}
 library(ggplot2)
 library(gganimate)
 library(dplyr)
@@ -233,7 +399,7 @@ axis(1, col = 'gray75', col.axis = 'gray33')
 
 plot(
   lm,
-  which = 4,
+  which = 5,
   bty = 'n',
   pch = 19,
   col = scales::alpha('#D55E00', .1),
@@ -269,9 +435,21 @@ train$log_price <- log(train$Price)
 #train$log_km <- log(train$km)
 ```
 
+
 ```{r}
+# Look the histograms of log_price and log_k
+```
+
 # Look the histograms of log_price and log_km
+```{r}
 par(mfrow=c(1,2))
+ggplot(train, aes(x = Price)) + 
+  geom_histogram(aes(y = ..density..),
+                 colour = 1, fill = "white") +
+  geom_density(lwd = 1, colour = 4,
+               fill = 4, alpha = 0.25) +
+  xlab("Price") + ylab("Density")
+
 ggplot(train, aes(x = log_price)) + 
   geom_histogram(aes(y = ..density..),
                  colour = 1, fill = "white") +
@@ -596,6 +774,9 @@ ggplot(data=train,aes(x = TankCapacity, y = lm_pwr$residuals)) +
 
 Pattern in length???
 Except in kilometer, where we can see a point with a very high leverage (outlier?).
+
+CHECKPOINT
+
 
 Let's try with lasso regression:
 
