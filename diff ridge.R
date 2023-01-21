@@ -15,7 +15,7 @@ library(DAAG)
 
 
 # Import the file 
-car <- read_csv("./car.csv")
+car <- read.csv("car.csv")
 car <- car[car$Kilometer != 2000.000, ]
 
 # Transform into factors

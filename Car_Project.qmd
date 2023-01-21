@@ -4,13 +4,13 @@ format: revealjs
 editor: visual
 ---
 
-## Quarto
+## Car Project
 
-This is a trial for a possible presentation for our project.
+blablabla
 
-## Bullets
+## Goal
 
-When you click the **Render** button a document will be generated that includes:
+Goal for our project
 
 -   Content authored with markdown
 -   Output from executable code
@@ -83,3 +83,5 @@ ggplot(data=train,aes(x = Price, y =  lm$residuals)) +
   #hrbrthemes::theme_ipsum_rc() +
   theme(title = element_text(colour = 'black'))
 ```
+
+## 
