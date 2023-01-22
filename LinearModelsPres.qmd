@@ -45,39 +45,40 @@ ggplot(car[ car$Kilometer < 100 & car$Kilometer >50 & car$Price>exp(13) & car$Pr
   scale_size(range = c(.2, 7), name="Engine")
 ```
 
-## Linear Model
+# Linear Models
 
-###### First, we split our data into train and test set.
+## First model {.smaller}
 
-```{r}
+Fit the first model, using the logarithm of *Price* as response variable
+
+```{r echo=F}
+# Train test split
 set.seed(1)
 index <- sample(nrow(car), nrow(car)*0.8, replace=F)
 train <- car[index,]
 test <- car[-index,]
-```
-
-Then fit the first model, using the logarithm of *Price*
-
-```{r}
 train$log_price <- log(train$Price)
+# First linear model
 lm1 <- lm(log_price ~ as.factor(Make)+Year+Kilometer+as.factor(Fuel.Type)+as.factor(Transmission)+as.factor(Owner)+as.factor(Seller.Type)+Engine+Power+Torque+
             as.factor(Drivetrain)+Length+Width+Height+as.factor(SeatingCapacity)
          +TankCapacity, data=train)
 summary(lm1)
 ```
 
-## Residuals plot
+## First model {.smaller}
+
+Residuals plot of the first model
 
 ```{r}
 par(mfrow=c(2,2))
 plot(lm1)
 ```
 
-## Residuals plot vs continuous explanatory variables
+## Residuals plot vs continuous explanatory variables {.smaller}
 
 Looking at the residuals plot vs the continuous explanatory variable is a good check to highlight (if there are) structures/patterns in the residuals (lab 6)
 
-## First reduction
+## Second model {.smaller}
 
 Remove the variables *Engine* and *Torque*
 
@@ -89,25 +90,39 @@ lm_pwr <- lm(log_price ~ as.factor(Make)+Year+Kilometer+as.factor(Fuel.Type)+as.
 summary(lm_pwr)
 ```
 
-## Residuals plot
+## Second model {.smaller}
+
+Residuals plot of the second model
 
 ```{r}
 par(mfrow=c(2,2))
 plot(lm_pwr)
 ```
 
+## Comparison {.smaller}
+
+The adjusted $R^2$ is good ($\sim 95\%$) for both models.
+
+###### Comparison of AIC values
+
+```{r}
+library(DAAG)
+Model <- c("First model", "Second model")
+AIC <- c(AIC(lm1),AIC(lm_pwr))
+cbind(Model, AIC)
+```
+
+## Comparison {.smaller}
+
+###### Anova test using the first and the second model
+
 ```{r}
 anova(lm_pwr,lm1)
 ```
 
-```{r}
-library(DAAG)
-AIC(lm_pwr)
-```
+The result of the anova test shows that there is no evidence to reject the reduced model
 
-## 
-
-Second reduction
+## Third model {.smaller}
 
 Remove the variables *Seller Type* and *Drive Train*
 
@@ -118,53 +133,36 @@ lm4 <- lm(log_price ~ as.factor(Make)+Year+Kilometer+as.factor(Fuel.Type)+as.fac
 summary(lm4)
 ```
 
+## Third model {.smaller}
+
 ```{r}
-AIC(lm4)
+par(mfrow=c(2,2))
+plot(lm4)
 ```
+
+## Comparison {.smaller}
+
+The adjusted $R^2$ is good ($\sim 95\%$) for both models.
+
+###### Comparison of AIC values
+
+```{r}
+Model <- c("Second model", "Third model")
+AIC <- c(AIC(lm_pwr),AIC(lm4))
+cbind(Model, AIC)
+```
+
+## Comparison {.smaller}
+
+###### Anova test using the first and the second model
 
 ```{r}
 anova(lm4, lm_pwr)
 ```
 
-```{r}
-library(MASS)
-par(mfrow=c(1,1))
-hist.scott(lm4$residuals, freq = F)
-curve(dnorm(x,0,sd(lm4$residuals)), add=T, col=2)
-```
+The result of the anova test shows that there is no evidence to reject the reduced model
 
-```{r}
-hist(lm4$residuals, freq = F, breaks = 15)
-curve(dnorm(x,0,sd(lm4$residuals)), add=T, col=2)
-```
-
-## Remove the variable Make
-
-```{r}
-lm_noMake <- lm(log_price ~ Year+Kilometer+as.factor(Fuel.Type)+as.factor(Transmission)+as.factor(Owner)+as.factor(Seller.Type)+Power+as.factor(Drivetrain)+Length+Width+Height+as.factor(SeatingCapacity)+TankCapacity, data=train)
-
-summary(lm_noMake)
-```
-
-```{r}
-AIC(lm_noMake)
-```
-
-```{r}
-anova(lm_noMake,lm_pwr)
-```
-
-## Comparison
-
-```{r}
-Model <- c("Full", "Fully reduced","No make")
-AIC <- c(AIC(lm1),AIC(lm4),AIC(lm_noMake))
-Adjusted_R2 <- c(summary(lm1)$adj.r.squared,summary(lm4)$adj.r.squared,summary(lm_noMake)$adj.r.squared)
-Residual_SE <- c(summary(lm1)$sigma,summary(lm4)$sigma,summary(lm_noMake)$sigma)
-cbind(model,AIC,Adjusted_R2,Residual_SE)
-```
-
-## Plot Fitted vs Predicted
+## Residuals against Fitted Values {.smaller}
 
 ```{r, echo=F}
 library(ggplot2)
@@ -187,4 +185,51 @@ axis(2, col = 'gray75', col.axis = 'gray33')
 axis(1, col = 'gray75', col.axis = 'gray33')
 ```
 
-## 
+There are no evident patterns in the residuals
+
+## Residuals {.smaller}
+
+```{r}
+library(MASS)
+par(mfrow=c(1,1))
+hist.scott(lm4$residuals, freq = F)
+curve(dnorm(x,0,sd(lm4$residuals)), add=T, col=2)
+```
+
+## Remove the variable Make {.smaller}
+
+Since the categorical variable *Make* has a lot of levels, try to remove it
+
+```{r}
+lm_noMake <- lm(log_price ~ Year+Kilometer+as.factor(Fuel.Type)+as.factor(Transmission)+as.factor(Owner)+as.factor(Seller.Type)+Power+as.factor(Drivetrain)+Length+Width+Height+as.factor(SeatingCapacity)+TankCapacity, data=train)
+
+summary(lm_noMake)
+```
+
+## Remove the variable Make {.smaller}
+
+The adjusted $R^2$ is a slightly lower than the previous model.
+
+Compare the AIC values and use the anova test
+
+```{r}
+Model <- c("Model with Make", "Model without Make")
+AIC <- c(AIC(lm4),AIC(lm_noMake))
+cbind(Model, AIC)
+```
+
+The AIC value for the model without *Make* is significantly larger
+
+```{r}
+anova(lm_noMake,lm4)
+```
+
+## Comparison
+
+```{r}
+Model <- c("Full", "Fully reduced","No make")
+AIC <- c(AIC(lm1),AIC(lm4),AIC(lm_noMake))
+Adjusted_R2 <- c(summary(lm1)$adj.r.squared,summary(lm4)$adj.r.squared,summary(lm_noMake)$adj.r.squared)
+Residual_SE <- c(summary(lm1)$sigma,summary(lm4)$sigma,summary(lm_noMake)$sigma)
+cbind(Model,AIC,Adjusted_R2,Residual_SE)
+```
