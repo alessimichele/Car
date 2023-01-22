@@ -208,9 +208,9 @@ summary(lm_noMake)
 
 ## Remove the variable Make {.smaller}
 
-The adjusted $R^2$ is a slightly lower than the previous model.
+The adjusted $R^2$ is slightly lower than in the previous model.
 
-Compare the AIC values and use the anova test
+Compare the AIC values
 
 ```{r}
 Model <- c("Model with Make", "Model without Make")
@@ -219,10 +219,6 @@ cbind(Model, AIC)
 ```
 
 The AIC value for the model without *Make* is significantly larger
-
-```{r}
-anova(lm_noMake,lm4)
-```
 
 ## Comparison
 
