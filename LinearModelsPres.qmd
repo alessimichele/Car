@@ -106,6 +106,7 @@ AIC(lm_pwr)
 ```
 
 ## 
+
 Second reduction
 
 Remove the variables *Seller Type* and *Drive Train*
