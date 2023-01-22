@@ -47,7 +47,7 @@ ggplot(car[ car$Kilometer < 100 & car$Kilometer >50 & car$Price>exp(13) & car$Pr
 
 ## Linear Model
 
-First, we split our data into train and test set.
+###### First, we split our data into train and test set.
 
 ```{r}
 set.seed(1)
