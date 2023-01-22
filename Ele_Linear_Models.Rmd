@@ -53,14 +53,13 @@ ggplot(data,aes(X,Y,fill=Z))+geom_tile()+theme(axis.text.x=element_text(angle = 
 From the book: "The equation $E(Y_i) = \beta_0 + \beta_1 x_{i1} + ...+ \beta_p x_{ip}$ assumes that the relationship between $E(Y )$ and each $x_j$ is linear"
 
 ```{r}
-pairs(~1/Kilometer+., data=car[,unlist(lapply(car, is.numeric), use.names = FALSE)])
+pairs(~., data=car[,unlist(lapply(car, is.numeric), use.names = FALSE)])
 ```
 
 
 Fit a simple linear model with all the covariates:
 ```{r}
-lm <- lm(Price ~ as.factor(Make)+Year+Kilometer+as.factor(Fuel.Type)+as.factor(Transmission)+
-         as.factor(Owner)+as.factor(Seller.Type)+Engine+Power+Torque+
+lm <- lm(Price ~ as.factor(Make)+Year+Kilometer+as.factor(Fuel.Type)+as.factor(Transmission)+as.factor(Owner)+as.factor(Seller.Type)+Engine+Power+Torque+
          as.factor(Drivetrain)+Length+Width+Height+as.factor(SeatingCapacity)
          +TankCapacity, data=train)
 summary(lm)
@@ -158,7 +157,6 @@ lm_pwr <- lm(log_price ~ as.factor(Make)+Year+Kilometer+as.factor(Fuel.Type)+as.
          as.factor(Owner)+as.factor(Seller.Type)+Power+
          as.factor(Drivetrain)+Length+Width+Height+as.factor(SeatingCapacity)
          +TankCapacity, data=train)
-
 summary(lm_pwr)
 ```
   - Residual standard error: 0.2068
@@ -174,11 +172,12 @@ anova(lm_pwr,lm1)
 
 
 ```{r}
+library(MASS)
 par(mfrow=c(1,1))
 plot(train$log_price, lm_pwr$residuals)
 plot(lm_pwr$residuals)
-hist.scott(lm_pwr$residuals, freq = F)
-curve(dnorm(x,0,sd(lm_pwr$residuals)), add=T, col=2)
+hist(lm4$residuals, freq = F, breaks = 15)
+curve(dnorm(x,0,sd(lm4$residuals)), add=T, col=2)
 ```
 
 ```{r}
@@ -243,33 +242,6 @@ coef(best_model)
 best_model
 ```
 
-Let's try with ridge regression:
-
-```{r}
-library(MASS)
-# Tuning parameter = 0 implies least square estimates
-
-lm_ridge<- lm.ridge(log_price ~ as.factor(Make)+Year+Kilometer+as.factor(Fuel.Type)+as.factor(Transmission)+
-         as.factor(Owner)+as.factor(Seller.Type)+Power+Engine+Torque+
-         as.factor(Drivetrain)+Length+Width+Height+as.factor(SeatingCapacity)
-         +TankCapacity, lambda=0, data=train)
-coef(lm_ridge)
-# select lambda by GCV in the model with logLDC
-grid.ridge<-lm.ridge(log_price ~ as.factor(Make)+Year+Kilometer+as.factor(Fuel.Type)+as.factor(Transmission)+
-         as.factor(Owner)+as.factor(Seller.Type)+Power+Engine+Torque+
-         as.factor(Drivetrain)+Length+Width+Height+as.factor(SeatingCapacity)
-         +TankCapacity,lambda=seq(0.1,10,0.001), data=train)
-
-lambda_selected<-grid.ridge$lambda[which(grid.ridge$GCV==min(grid.ridge$GCV))]
-
-lm_ridge_GCV <- lm.ridge(log_price ~ as.factor(Make)+Year+Kilometer+as.factor(Fuel.Type)+as.factor(Transmission)+
-         as.factor(Owner)+as.factor(Seller.Type)+Power+Engine+Torque+
-         as.factor(Drivetrain)+Length+Width+Height+as.factor(SeatingCapacity)
-         +TankCapacity, lambda=lambda_selected, data=train)
-coef(lm_ridge_GCV)
-summary(lm_ridge)
-```
-
 
 Linear model without make:
 
@@ -308,6 +280,11 @@ summary(lm_pwr)
 library(car)
 vif(lm1)
 vif(lm_pwr)
+
+library(DAAG)
+vif(lm1)
+vif(lm_pwr)
+vif(lm4)
 ```
 
 We can see that both levels of "seller" are not significant, let's try to remove it
@@ -348,6 +325,41 @@ plot(lm4)
 plot(lm4$residuals)
 ```
 
+
+Let's try with ridge regression:
+
+```{r}
+library(MASS)
+# Tuning parameter = 0 implies least square estimates
+
+lm_ridge<- lm.ridge(log_price ~ as.factor(Make)+Year+Kilometer+as.factor(Fuel.Type)+as.factor(Transmission)+
+         as.factor(Owner)+Power+Length+Width+Height+as.factor(SeatingCapacity)
+         +TankCapacity, lambda=0, data=train)
+coef(lm_ridge)
+# select lambda by GCV in the model with logLDC
+grid.ridge<-lm.ridge(log_price ~ as.factor(Make)+Year+Kilometer+as.factor(Fuel.Type)+as.factor(Transmission)+
+         as.factor(Owner)+Power+Length+Width+Height+as.factor(SeatingCapacity)
+         +TankCapacity,lambda=seq(0.1,10,0.001), data=train)
+
+lambda_selected<-grid.ridge$lambda[which(grid.ridge$GCV==min(grid.ridge$GCV))]
+
+lm_ridge_GCV <- lm.ridge(log_price ~ as.factor(Make)+Year+Kilometer+as.factor(Fuel.Type)+as.factor(Transmission)+
+         as.factor(Owner)+Power+Length+Width+Height+as.factor(SeatingCapacity)
+         +TankCapacity, lambda=lambda_selected, data=train)
+coef(lm_ridge_GCV)
+summary(lm_ridge)
+```
+
+
+```{r}
+c1 <- round(lm4$coefficients,4)
+c2 <- round(coef(lm_ridge_GCV),4)
+dif <- round(abs(c1-c2),4)
+View(cbind(c1,c2,dif))
+```
+
+
+
 Try to remove another explanatory variable, for example "Seating Capacity"
 
 ```{r}
@@ -360,13 +372,14 @@ anova(lm6,lm4)
 ```
 We can see that the more complex model is better!!
 
-Just to try, I remove a significant covariate, for example "Length" from lm3:
+Just to try, I remove a significant covariate, for example "Height" from lm3:
 
 ```{r}
 lm5 <- lm(log_price ~ as.factor(Make)+Year+Kilometer+as.factor(Fuel.Type)+as.factor(Transmission)+
-         as.factor(Owner)+Power+as.factor(Drivetrain)+Width+Height+as.factor(SeatingCapacity)
+         as.factor(Owner)+Power+as.factor(Drivetrain)+Width+Length+as.factor(SeatingCapacity)
          +TankCapacity, data=train)
 summary(lm5)
+AIC(lm5)
 anova(lm5,lm3)
 
 # We can see that the p-value is low so lm3 is better than lm5, this means that Length is significant
@@ -393,6 +406,8 @@ df_res <- train[larger.res,]
 #print(sort(predicted_test-test$log_price))
 ```
 
+ALCUNE PROVE!!
+
 Model 4 with interactions:
 ```{r}
 lm4_interactions <- lm(log_price ~ as.factor(Make)+Year+Kilometer+as.factor(Fuel.Type)+as.factor(Transmission)+
@@ -407,8 +422,9 @@ plot(lm4,which=c(1,2,4,5))
 ```
 
 ```{r}
-lm_step <- step(lm1, scale = 0,
-     direction = c("both", "backward", "forward"),steps = 1000, k = 2)
+#lm_step <- step(lm1, scale = 0, direction = c("both", "backward","forward"),
+ #               steps = 1000, k = 2) #c("both", "backward","forward")
+lm_step <- step(lm1)
 summary(lm_step)
 length(coefficients(lm_step))
 length(coefficients(lm1))
@@ -424,6 +440,77 @@ Like I did in the final lm4.
 ```{r}
 final4_vs_step <- c(AIC(lm4), AIC(lm_step))
 final4_vs_step
+```
+
+```{r}
+glm <- glm(Price ~ as.factor(Make)+Year+Kilometer+as.factor(Fuel.Type)+as.factor(Transmission)+
+         as.factor(Owner)+as.factor(Seller.Type)+Power+as.factor(Drivetrain)+
+           Length+Width+Height+as.factor(SeatingCapacity)+TankCapacity, 
+         family=Gamma(), data=train)
+summary(glm)
+```
+
+
+
+```{r}
+lm_sqrt <- lm(log_price ~as.factor(Make)+Year+Kilometer+as.factor(Fuel.Type)+
+                as.factor(Transmission)+as.factor(Owner)+sqrt(Power)+Length+
+                Width+Height+as.factor(SeatingCapacity)+TankCapacity, data=train)
+summary(lm_sqrt)
+AIC(lm_sqrt)
+```
+
+```{r}
+#"Model", "AIC", "Adjusted R^2", "Residual SE"
+model <- c("Full", "Fully reduced","No make")
+AIC <- c(AIC(lm1),AIC(lm4),AIC(lm_noMake))
+Adjusted_R2 <- c(summary(lm1)$adj.r.squared,summary(lm4)$adj.r.squared,summary(lm_noMake)$adj.r.squared)
+Residual_SE <- c(summary(lm1)$sigma,summary(lm4)$sigma,summary(lm_noMake)$sigma)
+View(cbind(model,AIC,Adjusted_R2,Residual_SE))
+```
+
+
+
+```{r}
+anova(lm1)
+```
+
+
+```{r}
+library(ggplot2)
+ggplot(data=train,aes(x = predict(lm4), y =  lm4$residuals)) +
+  geom_point(alpha = .25, color = '#D55E00') +
+  geom_abline(intercept = 0, 
+              slope = 0, 
+              color="black", 
+              size=.5,
+              alpha = .5)
+  #geom_smooth(color = '#56B4E9', se = F) +
+  labs(x = 'Price', y = 'Residuals', title = 'Fitted vs. Observed') +
+  #hrbrthemes::theme_ipsum_rc() +
+  theme(title = element_text(colour = 'black'))
+ggplot(train,aes(x=predict(lm4),y=lm4$residuals))+geom_point(alpha=.25,color='orange')+geom_smooth(color='red')+geom_hline(aes(yintercept=0),alpha=0.4)
+```
+
+```{r}
+library(ggplot2)
+plot(
+  lm4,
+  which = 1,
+  bty = 'n',
+  pch = 19,
+  col = scales::alpha('#D55E00', .2),
+  lwd = 2,
+  cex = .95,
+  col.lab = 'gray25',
+  col.axis = 'gray50',
+  col.sub = 'gray50',
+  cex.caption = 1,
+  cex.oma.main = 1.25,
+  yaxt = 'n'
+)
+axis(2, col = 'gray75', col.axis = 'gray33')
+axis(1, col = 'gray75', col.axis = 'gray33')
 ```
 
 
