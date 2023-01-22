@@ -1,0 +1,295 @@
+---
+title: "Cleaning and plot"
+author: "MP"
+date: "2023-01-20"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+require(readr)
+require(stringr)
+require(MASS)
+require(ggplot2)
+require(PerformanceAnalytics)
+require(corrplot)
+library(VIM)
+library(tidyverse)
+require(gridExtra)
+library(skimr)
+library(plotly)
+
+```
+
+
+# Import the file
+
+```{r}
+car <- read_csv("car details v4.csv",col_types = cols(Engine = col_number()))
+
+
+car$`Max Torque` <- as.numeric(str_extract(car$`Max Torque`,"[0-9]*\\.*[0-9]*"))
+car$`Max Power` <- as.numeric(str_extract(car$`Max Power`,"[0-9]*\\.*[0-9]*"))
+
+# Delete location and color
+car <- car[, -c(2,8,9)]
+```
+
+Our dataset contains information about prices and characteristics of used cars from 1986 to 2021 (?)
+The dataset is made up by 2059 observations available for 20 variables. We decided to discard two of them: Location and Color. SO we obtain a dataset containing 17 observations:
+
+- Make is the brand of the car. We have in total 33 (?) different brands.
+- The price to which the car is sold
+- The year of manifactiring of the car
+- The number of kilometers percorsi by the car
+- The fuel type
+- The kind of transmission
+- The type of the Owner
+- The seller type
+- Information about engine, max power and max torque
+- The drivetrain type
+- Meaures of the car (lenght, width and height)
+- The number of seats
+- The capacity of the fuel tank
+
+# Summary of the dataset
+```{r}
+skim(car)
+```
+As we can see from the summary, some observations have missing variables. Also we can see that the km distribution has a very large range of values, however the number of maximum kilometers is really high, so we assume that some 0 more has been added during transcription (we found a first outlier). Moreover, we notice how the distribution of Price is highly right-skewed with $mean=1702991.70$ rupie (I assume) and $median=825000$, which is way lower then the mean of the distribution. This is reasonable since in the dataset we have different car brands with different fasce di prezzo and expensive car are less frequent the standard cars
+
+# Delete observations for which NA >= p/2
+
+Since we have a good amount of observations, we decide to delete observations for which the number of missing informations is higher than half of the number of variables.
+
+```{r}
+for (i in 1:nrow(car)) {
+  if (sum(is.na(car[i, ])) >= 8) {
+    car <- car[-i, ]
+  } 
+}
+```
+
+# Count number of remaining missing values
+```{r}
+number <- car  %>%
+  summarise_all(list(~is.na(.)))%>%
+  pivot_longer(everything(),
+               names_to = "variables", values_to="missing") %>%
+  count(variables, missing) 
+
+miss <- as.data.frame(number[number$missing==T, ])
+miss <- miss[order(miss$n, decreasing = T), ]
+miss$proportion <- round((miss$n)/nrow(car)*100, 2)
+```
+```{r}
+miss
+```
+
+Nel ppt si può fare una tabella con i missing values
+
+# Impute missing values with their mean
+
+Since the number of remaining missing values is quite small, less than 10% of the total observations, we can safely impute them with their mean. 
+
+```{r}
+car$Height[is.na(car$Height)] <- mean(car$Height, na.rm=T)
+car$Width[is.na(car$Width)] <- mean(car$Width, na.rm=T)
+car$Length[is.na(car$Length)] <- mean(car$Length, na.rm=T)
+car$`Seating Capacity`[is.na(car$`Seating Capacity`)] <-5
+car$`Max Torque`[is.na(car$`Max Torque`)] <-mean(car$"Max Torque", na.rm=T)
+car$`Max Power`[is.na(car$`Max Power`)] <-mean(car$"Max Power", na.rm=T)
+car$`Engine`[is.na(car$`Engine`)] <-mean(car$"Engine", na.rm=T)
+car$`Fuel Tank Capacity`[is.na(car$`Fuel Tank Capacity`)] <-mean(car$"Fuel Tank Capacity", na.rm=T)
+car$`Drivetrain`[is.na(car$`Drivetrain`)] <- "FWD"
+
+# Check if everything is correct (should be 0)
+sum(is.na(car))
+```
+
+# Data exploration and cleaning
+
+- For numerical variables
+
+```{r}
+car <- car[car$Year!=1988,  ]
+car <- car[car$Kilometer!=0,  ]
+car <- car[car$Kilometer != 2000000 , ]
+car$Kilometer <- car$Kilometer/1000
+```
+
+We plotted separatly histograms and boxplots for each variables and deleted outliers from the dataset. The resulting dataset has 3 observations less wrt the original one
+
+- For categorical variables
+
+We analyzed the frequency of observations for each level of the categorical variables and added together levels with few observations in one single level
+
+```{r}
+fact <- c("CNG", "CNG + CNG", "Electric", "Hybrid", "LPG", "Petrol + CNG")
+car$`Fuel Type`[car$`Fuel Type` %in% fact] <- "Other"
+
+fact1 <- c("4 or More", "Fourth", "Third")
+car$Owner[car$Owner %in% fact1] <- "Third or more"
+
+fact2 <- c(2,4)
+car$`Seating Capacity`[car$`Seating Capacity` %in% fact2] <- "Less than 5"
+fact3 <- c(6,7,8)
+car$`Seating Capacity`[car$`Seating Capacity` %in% fact3] <- "More than 5"
+```
+
+
+# Data exploration of the cleaned dataset
+
+```{r}
+colnames(car) <- c("Make", "Price", "Year", "Kilometer", "Fuel.Type", "Transmission", "Owner", "Seller.Type", "Engine", "Power", "Torque", "Drivetrain", "Length", "Width", "Height", "SeatingCapacity", "TankCapacity")
+```
+
+
+- For numerical variables, we plot their distribution.
+
+Start by plotting th hist of the dependent variable and its log which appears more normally distributed
+
+```{r}
+p1 <- ggplot(car, aes(x=Price))+
+  geom_histogram(color="light green", fill="light green", bins = 50)+
+  ggtitle("Distribution of Price")+
+  labs(y="Frequency")+
+  theme_minimal()
+
+p2 <- ggplot(car, aes(x=log(Price)))+
+  geom_histogram(color="light green", fill="light green", bins = 50)+
+  labs(y="Frequency")+
+  ggtitle("Distribution of log(Price)")+theme_minimal()
+
+grid.arrange(p1, p2, ncol=2)
+```
+
+```{r}
+
+
+```
+
+
+- For categorical variables we provides barchart to understand the frequency of each class
+
+```{r}
+p12 <- ggplot(car, aes(x=reorder(Make, Make, function(x)-length(x)))) +
+  geom_bar(fill='steelblue') +
+  labs(x='Make')+
+  ggtitle("Distribution of Make")+theme_minimal()+theme(axis.text.x = element_text(angle = 90))
+```
+
+```{r}
+p13 <- ggplot(car, aes(x=reorder(Fuel.Type, Fuel.Type, function(x)-length(x)))) +
+  geom_bar(fill='steelblue') +
+  labs(x='Fuel Type')+
+  ggtitle("Distribution of Fuel Type")+theme_minimal()
+
+p14 <- ggplot(car, aes(x=reorder(Transmission,Transmission, function(x)-length(x)))) +
+  geom_bar(fill='steelblue') +
+  labs(x='Transmission')+
+  ggtitle("Distribution of Transmission")+theme_minimal()
+
+p15 <- ggplot(car, aes(x=reorder(Owner,Owner, function(x)-length(x)))) +
+  geom_bar(fill='steelblue') +
+  labs(x='Owner')+
+  ggtitle("Distribution of Owner")+theme_minimal()
+
+p16 <- ggplot(car, aes(x=reorder(Seller.Type, Seller.Type, function(x)-length(x)))) +
+  geom_bar(fill='steelblue') +
+  labs(x='Seller Type')+
+  ggtitle("Distribution of Seller Type")+theme_minimal()
+
+p17 <- ggplot(car, aes(x=reorder(Drivetrain, Drivetrain, function(x)-length(x)))) +
+  geom_bar(fill='steelblue') +
+  labs(x='Drivetrain')+
+  ggtitle("Distribution of Drivetrain")+theme_minimal()
+
+p18 <- ggplot(car, aes(x=reorder(SeatingCapacity, SeatingCapacity, function(x)-length(x)))) +
+  geom_bar(fill='steelblue') +
+  labs(x='Seating Capacity')+
+  ggtitle("Distribution of Seating Capacity")+theme_minimal()
+
+grid.arrange(p13, p14,p15, p16, p17, p18, ncol=3)
+
+```
+
+We start to study the relationship of the dependent variable with the other numerical ones
+
+
+```{r}
+car1 <- car[car$Kilometer !=925.000, ]
+p12 <- ggplot(car, aes(x = Year, y =log(Price))) +
+    geom_point(size=0.7)+
+  ggtitle("Distribution of log(Price) over the years")+ theme_classic()
+
+p13 <-ggplot(car1, aes(x = Kilometer, y =log(Price))) +
+    geom_point(size=0.7)+
+  ggtitle("Distribution of log(Price) vs travelled Kilometer")+ theme_classic() 
+
+p14 <- ggplot(car, aes(x = Engine, y =log(Price))) +
+    geom_point(size=0.7)+
+  ggtitle("Distribution of log(Price) vs Engine")+ theme_classic()
+
+p15 <- ggplot(car, aes(x = Power, y =log(Price))) +
+    geom_point(size=0.7)+
+  ggtitle("Distribution of log(Price) vs Max Power")+ theme_classic()
+
+p16 <- ggplot(car, aes(x = Torque, y =log(Price))) +
+    geom_point(size=0.7)+
+  ggtitle("Distribution of log(Price) vs Max Torque")+ theme_classic()
+
+p17 <- ggplot(car, aes(x = Length, y =log(Price))) +
+    geom_point(size=0.7)+
+  ggtitle("Distribution of log(Price) vs Length")+ theme_classic()
+
+p18 <- ggplot(car, aes(x = Width, y =log(Price))) +
+    geom_point(size=0.7)+
+  ggtitle("Distribution of log(Price) vs Width")+ theme_classic()
+
+p19 <- ggplot(car, aes(x = Height, y =log(Price))) +
+    geom_point(size=0.7)+
+  ggtitle("Distribution of log(Price) vs Height")+ theme_classic()
+
+p20 <- ggplot(car, aes(x = TankCapacity, y =log(Price))) +
+    geom_point(size=0.7)+
+  ggtitle("Distribution of log(Price) vs Fuel Tank Capacity")+ theme_classic()
+
+grid.arrange(p12, p13, p14,p15, p16, p17, p18, p19, p20, ncol=3)
+```
+
+We can observe an increasing trend in price for increasing value of other variables, except for the number of kilometer for whixh a very slow decreasing trend can be spotted. Instead for what concernes dimensions of the car, lenght and height seems to have a posite relationship with car price, but no significant pattern can be spotted in the Price vs Height plot (we can exclude the variable from the model)
+
+
+From the following scatterplot we can see a very small decreasing trend in the log of Prices as the number of kilometers increases, but most important we can see that, in general, for a similar number of km, older cars (darker points) have a lower price than newer ones (light points) (as expected)
+```{r}
+car1 <- car[car$Kilometer !=925.000, ]
+pl1 <- ggplot(car1, aes(x=Kilometer, y=log(Price)))+
+  geom_point(aes(col=Year))+theme_classic()
+ggplotly(pl1)
+```
+
+same thing can be said for what refers to brand. For two cars having the same number of km, the brand makes a great difference in the log of price (Tata with 60 000km costs 10.79 (da trasformare), while a Rolls-Royce with same number of kilometer costs 16.70)
+
+```{r}
+pl2 <- ggplot(car1, aes(x=Kilometer, y=log(Price)))+
+  geom_point(aes(col=Make))+theme_classic()
+ggplotly(pl2)
+```
+
+
+```{r}
+pl3 <- ggplot(car1, aes(x=Year, y=log(Price)))+
+  geom_point(aes(col=Make))+theme_classic()
+ggplotly(pl3)
+```
+
+We study also correlation of the numerical variables with Price and among themselves
+
+```{r}
+M <- round(cor(car[, c(2, 3, 4, 9:11, 13:15, 17)]),2)
+corrplot(M, method="number", number.cex = 0.7, tl.col = "black")
+
+```
+
+According to the corrplot, I'd delete the Height variable since it'is not correlated with Price and add not a real pattern with log(Price), but I'd lascerei year and km, since they showed a clear trend in the scatter plots. For what concernes correlated features, I'd deleet torque and Engine, since they are highly correlated with Power.
