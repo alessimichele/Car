@@ -11,6 +11,7 @@ library(stringr)
 library(plotly)
 library(MASS)
 library(glmnet)
+library(DAAG)
 ```
 
 
@@ -71,11 +72,11 @@ temp <- ndf[price_outliers,]
 ## Kilometers distribution
 
 par(mfrow=c(2,2))
-km_outliers <- which(car$km> quantile(car$km,0.9999))
-boxplot(car$km[-km_outliers])
-hist.scott(car$km[-km_outliers],prob = F)
-boxplot(sqrt(car$km[-km_outliers]))
-hist.scott(sqrt(car$km[-c(km_outliers,1767)]),prob = F)
+km_outliers <- which(car$Kilometer> quantile(car$Kilometer,0.999))
+boxplot(car$Kilometer[-km_outliers])
+hist.scott(car$Kilometer[-km_outliers],prob = F)
+boxplot(sqrt(car$Kilometer[-km_outliers]))
+hist.scott(log(car$Kilometer[-c(km_outliers,1767)]),prob = F)
 ```
 
 
@@ -163,6 +164,7 @@ p<-dnorm(myhist$mids,0,1)*0.5
 sd<-sqrt(n*p*(1-p))
 points(myhist$mids,n*p,pch=20,col=4)
 segments(myhist$mids,n*p-sd,myhist$mids,n*p+sd,col=4)
+curve(dnorm(x)*n*0.5,add=T)
 
 dici <- which(myhist$counts >= 30)
 chi2 <- sum((myhist$counts[dici]-n*p[dici])^2/sd[dici]^2)
@@ -197,8 +199,12 @@ scores <- rbind(scores,cbind("lasso",NA,glm_lasso$nulldev,(1-glm_lasso$dev.ratio
 glm_lasso
 ```
 
+
+## Step
 ```{r}
-glm_step <- step(glm_full)
+glm_null <- glm(Price~1,data=train,family=Gamma("log"))
+biggest <- formula(glm_full)
+glm_step <- step(glm_null,direction = "forward",scope=biggest)
 summary(glm_step)
 newrow <- c(model="step", aic=summary(glm_step)$aic,null.dev=summary(glm_step)$null.deviance,deviance=summary(glm_step)$deviance,mare=NA)
 scores <- rbind(scores,newrow)
@@ -260,6 +266,14 @@ glm_ridge
 
 
 
+## Gamma(identity)
+does not work.
+```{r}
+glm_iden <- glm(Price~.-Drivetrain-Engine-Torque-Seller.Type,data=train,family=Gamma("identity"),start=seq(1000,length.out=nrow(summary(glm_reduced_make)$coef)),control = list(maxit=50))
+
+
+summary(glm_iden)
+```
 
 
 
@@ -280,15 +294,52 @@ summary(glm_inter)
 ## Plot price vs everything
 ```{r}
 y_pred <- predict(glm_reduced_make,newdata=test,type="response")
-for(col in colnames(test)){
-  plot(test[,col],test$Price,main=paste(col))
-  points(test[,col],y_pred,col=2)
+for(col in colnames(train)){
+  plot(train[,col],train$Price,main=paste(col))
+  #points(test[,col],y_pred,col=2)
 }
+```
+
+
+
+```{r}
+car_dum <- read.csv("../archive/car details v4.csv",header=T)
+with(car_dum,boxplot(log(Price)~Color))
+
+count(car_dum$Color)
+sort(table(as.factor(car_dum$Color)))
+
+table(car$SeatingCapacity)
+
+
+ggplot(car_dum,aes(x=Year,y=log(Price))) + geom_point(aes(col=Color))
 ```
 
 
 ```{r}
 with(car, plot(Price~log(Kilometer),xlim=c(6,12)))
 points(y=predict(glm_lasso,newx=xx,type="response"),x=log(car$Kilometer),col=2)
+```
+```{r}
+with(car,boxplot(log(Price)~Make))
+```
+
+## overengineered plot for prices vs make according to coefficient sign
+```{r}
+gz <- as.numeric(coef(glm_reduced_make)[2:33]>0)
+coef(glm_reduced_make)[2:33]>0
+mks<- sort(unique(train$Make))[-1][coef(glm_reduced_make)[2:33]>0]
+clrs <- character(length=nrow(car))
+
+price <- character(length=nrow(train))
+price[train$Make %in% mks] <- "Higher"
+price[!(train$Make %in% mks)] <- "Lower"
+price[train$Make == "Audi"] <- "Baseline"
+
+clrs[car$Make %in% mks] <- "#40e35e"
+clrs[!(car$Make %in% mks)] <- "#e35540"
+
+med <- log(median(train[train$Make=="Audi",]$Price))
+ggplot(train,aes(x=Make,y=log(Price),col=price,fill=price))+geom_boxplot(alpha=0.4)+geom_hline(aes(yintercept=med))+theme(axis.text.x=element_text(angle = -90, hjust = 0))+scale_fill_manual(values = c("grey","#389129","#ad1d13"))+scale_color_manual(values = c("grey","#389129","#ad1d13"))
 ```
 
