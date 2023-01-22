@@ -199,8 +199,12 @@ scores <- rbind(scores,cbind("lasso",NA,glm_lasso$nulldev,(1-glm_lasso$dev.ratio
 glm_lasso
 ```
 
+
+## Step
 ```{r}
-glm_step <- step(glm_full)
+glm_null <- glm(Price~1,data=train,family=Gamma("log"))
+biggest <- formula(glm_full)
+glm_step <- step(glm_null,direction = "forward",scope=biggest)
 summary(glm_step)
 newrow <- c(model="step", aic=summary(glm_step)$aic,null.dev=summary(glm_step)$null.deviance,deviance=summary(glm_step)$deviance,mare=NA)
 scores <- rbind(scores,newrow)
@@ -291,7 +295,7 @@ summary(glm_inter)
 ```{r}
 y_pred <- predict(glm_reduced_make,newdata=test,type="response")
 for(col in colnames(train)){
-  plot(train[,col],residuals(glm_reduced_make,"pearson"),main=paste(col))
+  plot(train[,col],train$Price,main=paste(col))
   #points(test[,col],y_pred,col=2)
 }
 ```
