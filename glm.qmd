@@ -27,7 +27,7 @@ train <- car[index,]
 test <- car[-index,]
 ```
 ```{r}
-par(mfrow=c(2,2),ann=F)
+par(mfrow=c(2,2))
 means <- tapply(train$Price,train$Year,mean)
 with(train,boxplot(Price~Year))
 points(means,col=2,pch=20)
@@ -136,3 +136,40 @@ print(paste("p-value =",round(pchisq(2*st$Deviance[2],st$Df[2],lower.tail = F),2
 ```
 
 # Comparison 
+
+## Similarities
+The LM and the GLM perform very similarly:
+
+- The residuals do not show clear non-linearities nor eteroscedasticity
+- The explained null deviance is $\approx 95\%$
+- The mean absolute percentage error in prediction on new data is 17%
+- The coefficients are mostly the same within one standard error
+
+## Interpretation of parameters
+For both models the interpretation is the same: upon increasing the value for a variable by one unit and leaving the others fixed, the price increases or decreases by a factor $exp(\beta)$, according to the sign of the coefficient.
+
+For instance, an increase by 10'000km amounts to a decrease in prie of about 1%.
+
+## Interpretation of parameters
+For categorical variables, for each level the coefficient is such that the price increases or decreases by a factor $exp(\beta)$ with respect to the price for the base level.  
+
+For instance, Unregistered cars cost 13% more than cars with one previous owner.
+
+## Interpretation of parameters
+```{r}
+gz <- as.numeric(coef(glm_reduced_make)[2:33]>0)
+mks<- sort(unique(train$Make))[-1][coef(glm_reduced_make)[2:33]>0]
+
+price <- character(length=nrow(train))
+price[train$Make %in% mks] <- "Higher"
+price[!(train$Make %in% mks)] <- "Lower"
+price[train$Make == "Audi"] <- "Baseline"
+
+med <- log(median(train[train$Make=="Audi",]$Price))
+ggplot(train,aes(x=Make,y=log(Price),col=price,fill=price))+geom_boxplot(alpha=0.4)+geom_hline(aes(yintercept=med))+theme(axis.text.x=element_text(angle = -90, hjust = 0))+scale_fill_manual(values = c("grey","#389129","#ad1d13"))+scale_color_manual(values = c("grey","#389129","#ad1d13"))
+```
+# Bonus
+## Random Forest
+- Performs better in prediction, with an error of $\approx 9\%$
+- Worse interpretability
+- Hard to understand the real model
