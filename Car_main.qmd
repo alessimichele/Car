@@ -1,0 +1,661 @@
+---
+title: "Car"
+format: revealjs
+editor: visual
+author: Michele Alessi, Gabriele Codega, Maria Pronestì, Elena Rivaroli
+---
+
+```{r echo=FALSE}
+require(readr)
+require(stringr)
+require(MASS)
+require(ggplot2)
+require(PerformanceAnalytics)
+require(corrplot)
+library(VIM)
+library(tidyverse)
+require(gridExtra)
+library(MASS)
+library(DAAG)
+library(skimr)
+library(plotly)
+```
+
+## Aim of the project
+
+Our dataset contains information about used cars from 1988 to 2022. We have information about the selling price, in Indian Rupee, together with some characteristics of the car.
+
+According to the available data, we decided to build a statistical model for predicting the price of a car having specified features.
+
+## Step
+
+-   Exploratory Data Analysis
+
+-   Linear Model
+
+-   Generalized Linear Model
+
+-   Comparison and Conclusions
+
+# Exploratory Data Analysis
+
+## Dataset description {.scrollable}
+
+```{r echo=F}
+car <- read_csv("car details v4.csv",col_types = cols(Engine = col_number()))
+car$`Max Torque` <- as.numeric(str_extract(car$`Max Torque`,"[0-9]*\\.*[0-9]*"))
+car$`Max Power` <- as.numeric(str_extract(car$`Max Power`,"[0-9]*\\.*[0-9]*"))
+
+
+```
+
+We have 2059 observations and 20 variables, of which 9 numerical and 11 categorical, listed below.
+
+-   **Make** is the company producing the car
+
+-   **Model** is the proper name of the car
+
+-   **Fuel** **Type** is type of fuel used by the car
+
+-   **Transmission** is the gear transmission of the car
+
+-   **Location** is the city in which the car is sold
+
+-   **Color** is the color of the vehicle
+
+-   **Owner** counts the number of previous owners
+
+-   **Seller type** tells if the car is sold by a private or not
+
+-   **Seating Capacity** is max number of people that can fir in a car
+
+-   **Price** is the selling price of the car in INR (1 INR = 0.017 USD)
+
+-   **Year** of manufacturing of the car
+
+-   **Kilometer** is the total number of km driven by the car
+
+-   **Engine** is the engine capacity measure in cc
+
+-   **Max Power** is the maximum power achieved by the car measured in bhp\@rpm
+
+-   **Max Torque** is the maximum torque measured in Nm\@rpm
+
+-   **Drivetrain** is the type of car drivetrain
+
+-   Measures of the car given by **length**, **width** and **height** expressed in mm
+
+-   **Fuel Tank Capacity** tells the maximum fuel capacity of the car in liters
+
+## Summary
+
+```{r}
+summary(car)
+```
+
+-   For some variables we observed large ranges of values, for instance Price and Kilometer.
+
+------------------------------------------------------------------------
+
+## Dealing with missing values {.smaller}
+
+```{r echo=F}
+number <- car  %>%
+  summarise_all(list(~is.na(.)))%>%
+  pivot_longer(everything(),
+               names_to = "variables", values_to="missing") %>%
+  count(variables, missing) 
+
+miss <- as.data.frame(number[number$missing==T, ])
+miss <- miss[order(miss$n, decreasing = T), ]
+miss <- miss[,-2]
+miss$proportion <- round((miss$n)/nrow(car)*100, 2)
+colnames(miss) <- c("Variable", "Number of missing values", "Proportion")
+miss
+```
+
+-   Since we have a reasonable number of observations, we decided to delete the ones for which the number of missing values is higher than half of the variables
+
+-   After deleting 63 observations, we still observe some missing information
+
+```{r echo=F}
+for (i in 1:nrow(car)) {
+  if (sum(is.na(car[i, ])) >= 8) {
+    car <- car[-i, ]
+  } 
+}
+
+number <- car  %>%
+  summarise_all(list(~is.na(.)))%>%
+  pivot_longer(everything(),
+               names_to = "variables", values_to="missing") %>%
+  count(variables, missing) 
+
+miss <- as.data.frame(number[number$missing==T, ])
+miss <- miss[order(miss$n, decreasing = T), ]
+miss <- miss[,-2]
+miss$proportion <- round((miss$n)/nrow(car)*100, 2)
+colnames(miss) <- c("Variable", "Number of missing values", "Proportion")
+miss
+```
+
+-   Since the total proportion of missing values is quite low with respect to the number of observations ($\approx 9\%$), we used *mean imputation*
+
+```{r echo=F}
+car$Height[is.na(car$Height)] <- mean(car$Height, na.rm=T)
+car$Width[is.na(car$Width)] <- mean(car$Width, na.rm=T)
+car$Length[is.na(car$Length)] <- mean(car$Length, na.rm=T)
+car$`Seating Capacity`[is.na(car$`Seating Capacity`)] <-5
+car$`Max Torque`[is.na(car$`Max Torque`)] <-mean(car$"Max Torque", na.rm=T)
+car$`Max Power`[is.na(car$`Max Power`)] <-mean(car$"Max Power", na.rm=T)
+car$`Engine`[is.na(car$`Engine`)] <-mean(car$"Engine", na.rm=T)
+car$`Fuel Tank Capacity`[is.na(car$`Fuel Tank Capacity`)] <-mean(car$"Fuel Tank Capacity", na.rm=T)
+car$`Drivetrain`[is.na(car$`Drivetrain`)] <- "FWD"
+```
+
+## Cleaning phase {.smaller}
+
+-   For each *numerical variable* we plotted histograms and boxplots separatly to study their distribution and detect possible outliers
+
+-   We spotted two outliers in the Kilometer variables and deleted them from the datset
+
+-   We deleted also the only observation coming from 1988, in order to have only recent data going from 2006 to 2022
+
+-   For each *categorical variables* we studied the frequency of observations for each level, using two-way tables and barcharts
+
+-   For each variable, we merged together levels showing a small number of observations
+
+```{r echo=F}
+library(ggplot2)
+library(plotly)
+car <- read.csv("./car.csv")
+# Remove observation 1080
+car <- car[car$Kilometer != 2000.000,]
+```
+
+## Price and Log Price
+
+```{r}
+p1<-ggplot(car, aes(x = Price)) + 
+  geom_histogram(aes(y = ..density..),
+                 colour = 1, fill = "white") +
+  xlab("Price") + ylab("Density")
+
+p2<-ggplot(car, aes(x = log(Price))) + 
+  geom_histogram(aes(y = ..density..),
+                 colour = 1, fill = "white") +
+  geom_density(lwd = 1, colour = 4,
+               fill = 4, alpha = 0.25) +
+  xlab("Log Price") + ylab("Density") +
+stat_function(fun = dnorm, 
+              args = list(mean = mean(log(car$Price)), sd = sd(log(car$Price))),
+              colour =2,
+              lwd = 1,
+              alpha = 1)
+
+grid.arrange(p1,p2, ncol=2)
+```
+
+## Log Price vs Numerical Variables
+
+```{r}
+car1 <- car[car$Kilometer !=925.000, ]
+p12 <- ggplot(car, aes(x = Year, y =log(Price))) +
+    geom_point(size=0.7)+
+  ggtitle("log(Price) over the years")+ theme_classic()
+
+p13 <-ggplot(car1, aes(x = Kilometer, y =log(Price))) +
+    geom_point(size=0.7)+
+  ggtitle("log(Price) vs Kilometer")+ theme_classic() 
+
+p14 <- ggplot(car, aes(x = Engine, y =log(Price))) +
+    geom_point(size=0.7)+
+  ggtitle("log(Price) vs Engine")+ theme_classic()
+
+p15 <- ggplot(car, aes(x = Power, y =log(Price))) +
+    geom_point(size=0.7)+
+  ggtitle("log(Price) vs Power")+ theme_classic()
+
+p16 <- ggplot(car, aes(x = Torque, y =log(Price))) +
+    geom_point(size=0.7)+
+  ggtitle("log(Price) vs Torque")+ theme_classic()
+
+p17 <- ggplot(car, aes(x = Length, y =log(Price))) +
+    geom_point(size=0.7)+
+  ggtitle("log(Price) vs Length")+ theme_classic()
+
+p18 <- ggplot(car, aes(x = Width, y =log(Price))) +
+    geom_point(size=0.7)+
+  ggtitle("log(Price) vs Width")+ theme_classic()
+
+p19 <- ggplot(car, aes(x = Height, y =log(Price))) +
+    geom_point(size=0.7)+
+  ggtitle("log(Price) vs Height")+ theme_classic()
+
+p20 <- ggplot(car, aes(x = TankCapacity, y =log(Price))) +
+    geom_point(size=0.7)+
+  ggtitle("log(Price) vs Fuel Tank Capacity")+ theme_classic()
+
+grid.arrange(p12, p13, p14,p15, p16, p17, p18, p19, p20, ncol=3)
+```
+
+## Log Price vs Make
+
+```{r}
+car %>%
+  ggplot( aes(x=Make, y=log(Price), fill=Make)) +
+    geom_boxplot() +
+    geom_jitter(color="black", size=0.2, alpha=0.5) +
+    theme(axis.text.x=element_text(angle = -90, hjust = 0)) +
+    ggtitle("Log Price vs Make") + 
+    xlab("") + ylab("Log Price")
+```
+
+## Correlation Matrix
+
+```{r}
+library(corrplot)
+cor_mat <- cor(car[,unlist(lapply(car, is.numeric), use.names = FALSE)],use = "complete.obs")
+data<-expand.grid(X=unlist(dimnames(cor_mat)[2]),Y=unlist(dimnames(cor_mat)[2]))
+data$Z<- c(cor_mat)
+
+#ggplot(data,aes(X,Y,fill=Z))+geom_tile()+theme(axis.text.x=element_text(angle = -90, hjust = 0))+coord_equal()+scale_y_discrete(limits=rev)+geom_text(aes(label=prettyNum(Z,digits=2,format="f")), color="white", size=4)
+
+
+corrplot(cor_mat, type = "lower", tl.col = "black")
+```
+
+## Train and test sets
+
+-   Since we are trying to build a model for prediction purposes, we decided to split the original dataset into train and test set. We use the train set to build the model and then asses its performance using the test set.
+
+<!-- -->
+
+-   We decided to randomly split the dataset, using $80\%$ of the observations for creating the model. We end up with $1594$ observations and 17 variables to build the model.
+
+# Linear Models
+
+```{r echo=F}
+car <- read.csv("./car.csv")
+# Remove observation 1080
+car <- car[car$Kilometer != 2000.000,]
+```
+
+## First model {.smaller}
+
+Fit the first model, using the logarithm of *Price* as response variable
+
+```{r echo=F}
+# Train test split
+set.seed(1)
+index <- sample(nrow(car), nrow(car)*0.8, replace=F)
+train <- car[index,]
+test <- car[-index,]
+train$log_price <- log(train$Price)
+# First linear model
+lm1 <- lm(log_price ~ as.factor(Make)+Year+Kilometer+as.factor(Fuel.Type)+as.factor(Transmission)+as.factor(Owner)+as.factor(Seller.Type)+Engine+Power+Torque+
+            as.factor(Drivetrain)+Length+Width+Height+as.factor(SeatingCapacity)
+         +TankCapacity, data=train)
+summary(lm1)
+```
+
+## First model {.smaller}
+
+Residuals plot of the first model
+
+```{r}
+par(mfrow=c(2,2))
+plot(
+  lm1,
+  which = c(1,2,3,5),
+  bty = 'n',
+  pch = 19,
+  col = scales::alpha('#D55E00', .1),
+  #col.smooth = '#56B4E9',
+  lwd = 1,
+  cex =.95,
+  col.lab = 'gray25',
+  col.axis = 'gray50',
+  col.sub = 'gray50',
+  cex.caption = 1,
+  cex.oma.main = 1.25,
+  #yaxt = 'n'
+)
+
+```
+
+## Second model {.smaller}
+
+We removed *Engine*, *Torque*, *Seller Type* and *Drivetrain*.
+
+```{r}
+lm4 <- lm(log_price ~ as.factor(Make)+Year+Kilometer+as.factor(Fuel.Type)+as.factor(Transmission)+
+         as.factor(Owner)+Power+Length+Width+Height+as.factor(SeatingCapacity)
+         +TankCapacity, data=train)
+summary(lm4)
+```
+
+## Second model {.smaller}
+
+```{r}
+par(mfrow=c(2,2))
+plot(
+  lm4,
+  which = c(1,2,3,5),
+  bty = 'n',
+  pch = 19,
+  col = scales::alpha('#D55E00', .1),
+  #col.smooth = '#56B4E9',
+  lwd = 1,
+  cex =.95,
+  col.lab = 'gray25',
+  col.axis = 'gray50',
+  col.sub = 'gray50',
+  cex.caption = 1,
+  cex.oma.main = 1.25,
+  #yaxt = 'n'
+)
+```
+
+## Residuals {.smaller}
+
+```{r}
+library(MASS)
+library(ggplot2)
+ggplot(train, aes(x = lm4$residuals)) + 
+  geom_histogram(aes(y = ..density..),
+                 colour = 1, fill = "white") +
+  geom_density(lwd = 1, colour = 4,
+               fill = 4, alpha = 0.25) +
+  xlab("Residuals") + ylab("Density") +
+stat_function(fun = dnorm, 
+              args = list(mean = 0, sd = sd(lm4$residuals)),
+              colour =2,
+              lwd = 1,
+              alpha = 1)
+```
+
+## Comparison {.smaller}
+
+-   The adjusted $R^2$ is good ($\sim 95\%$) for both models.
+
+-   Comparison of AIC values
+
+```{r}
+Model <- c("First model", "Second model")
+AIC <- c(AIC(lm1),AIC(lm4))
+LogLikelihhod<- c(logLik(lm1),logLik(lm4))
+as.data.frame(cbind(Model, AIC, LogLikelihhod))
+```
+
+-   Anova test using the first and the second model shows that there is no evidence to reject the reduced model:
+
+```{r echo=F}
+a<-anova(lm4, lm1)
+print(paste("P-val:",a$`Pr(>F)`[2]))
+```
+
+## Remove the variable *Make* {.smaller}
+
+Since the categorical variable *Make* has a lot of levels, try to remove it
+
+```{r}
+lm_noMake <- lm(log_price ~ Year+Kilometer+as.factor(Fuel.Type)+as.factor(Transmission)+as.factor(Owner)+as.factor(Seller.Type)+Power+as.factor(Drivetrain)+Length+Width+Height+as.factor(SeatingCapacity)+TankCapacity, data=train)
+```
+
+-   The adjusted $R^2$ is slightly lower than in the previous model (0.93 vs 0.96)
+
+-   Compare the AIC values
+
+```{r}
+Model <- c("Model with Make", "Model without Make")
+AIC <- c(AIC(lm4),AIC(lm_noMake))
+as.data.frame(cbind(Model, AIC))
+```
+
+The AIC value for the model without *Make* is significantly larger
+
+## Comparison
+
+```{r}
+Model <- c("Full", "Reduced","No make")
+AIC <- c(AIC(lm1),AIC(lm4),AIC(lm_noMake))
+Adjusted_R2 <- c(summary(lm1)$adj.r.squared,summary(lm4)$adj.r.squared,summary(lm_noMake)$adj.r.squared)
+Residual_SE <- c(summary(lm1)$sigma,summary(lm4)$sigma,summary(lm_noMake)$sigma)
+as.data.frame(cbind(Model,AIC,Adjusted_R2,Residual_SE))
+```
+
+# GLM
+
+## Motivation
+
+Scatterplots for price vs. other variables show an increase in variance for higher prices.
+
+```{r,echo=F}
+car<-read.csv("car.csv")
+
+# Transform categorical variables into factors
+car$Make <- as.factor(car$Make)
+car$Fuel.Type <- as.factor(car$Fuel.Type)
+car$Transmission <- as.factor(car$Transmission)
+car$Owner <- as.factor(car$Owner)
+car$Seller.Type<- as.factor(car$Seller.Type)
+car$Drivetrain <- as.factor(car$Drivetrain)
+car$SeatingCapacity <- as.factor(car$SeatingCapacity)
+
+car <- car[car$Kilometer != 2000,]
+
+set.seed(1)
+index <- sample(nrow(car),nrow(car)*0.8,replace = F)
+train <- car[index,]
+test <- car[-index,]
+```
+
+```{r}
+par(mfrow=c(2,2))
+means <- tapply(train$Price,train$Year,mean)
+with(train,boxplot(Price~Year))
+points(means,col=2,pch=20)
+with(train,plot(Kilometer,Price))
+with(train,plot(Power,Price))
+with(train,plot(Length,Price))
+```
+
+## First model
+
+-   The increase in variance suggests that the price follows a gamma distribution
+-   Since the price is always going to be positive, we can fulfil the requirement that the mean be strictly positive by choosing a log link
+
+We removed Torque and Engine, which are strongly correlated, and we fitted a model.
+
+```{r}
+glm_full <- glm(Price~.-Engine-Torque,data=train,family=Gamma(link="log"))
+```
+
+## First model
+
+```{r}
+summary(glm_full)
+```
+
+We can see that Drivetrain and Seller Type are not significant
+
+## Assessment of assumptions
+
+We can check that our assumptions hold by looking at the residuals
+
+```{r}
+library(ggplot2)
+par(mfrow=c(2,2))
+plot(glm_full,pch=20,col=alpha('orange',0.25),panel=function(x, y, col = par("col"), bg = NA, pch = par("pch"),cex = 1, col.smooth = 2, span = 2/3, iter = 3)panel.smooth(x, y, col = alpha('orange',0.25), bg = NA, pch = 20,cex = 1, span = 2/3, iter = 3,col.smooth = 'blue'))
+```
+
+## Assessment of assumptions
+
+-   We do not observe evidence of heteroscedasticity nor overdispersion
+-   The standardized residuals are approximately normal
+-   There are no patterns to suggest non-linearity
+
+## Second model
+
+We remove the non-significant variables and fit another model
+
+```{r}
+glm_reduced_make <- glm(Price~.-Seller.Type-Engine-Torque-Drivetrain,data=train,family = Gamma(link="log"))
+summary(glm_reduced_make)
+```
+
+In this model most of the variables are significant
+
+## Comparison
+
+We can compare the two models
+
+```{r}
+scores <- data.frame(Model=NA,df=NA,Dev=NA,AIC=NA)
+scores[1,] <- list(Model="Full",
+                   df = summary(glm_full)$df[1],
+                   Dev = summary(glm_full)$deviance,
+                   AIC = summary(glm_full)$aic)
+scores[2,] <- list(Model="Reduced",
+                   df=summary(glm_reduced_make)$df[1],
+                   Dev=summary(glm_reduced_make)$deviance,
+                   AIC=summary(glm_reduced_make)$aic)
+scores
+```
+
+Since deviances are very similar and AIC is slightly lower for the reduced model, we shall choose the latter. Moreover, a LRT shows that there is no evidence toward rejecting the simpler model
+
+```{r}
+st <- anova(glm_reduced_make,glm_full,"Chisq")
+print(paste("p-value =",round(pchisq(2*st$Deviance[2],st$Df[2],lower.tail = F),2)))
+```
+
+## Assessment of assumptions
+
+We inspect the residuals from the reduce model to check that our assumptions are met
+
+```{r}
+library(ggplot2)
+par(mfrow=c(2,2))
+plot(glm_reduced_make,pch=20,col=alpha('orange',0.25),panel=function(x, y, col = par("col"), bg = NA, pch = par("pch"),cex = 1, col.smooth = 2, span = 2/3, iter = 3)panel.smooth(x, y, col = alpha('orange',0.25), bg = NA, pch = 20,cex = 1, span = 2/3, iter = 3,col.smooth = 'blue'))
+```
+
+```{r,eval=F}
+library(ggplot2)
+ggplot(train,aes(x=predict(glm_reduced_make),y=glm_reduced_make$residuals))+geom_point(alpha=.25,color='orange')+geom_smooth(color='blue')+geom_hline(aes(yintercept=0),alpha=0.4)
+```
+
+## Assessment of assumptions
+
+-   We do not observe evidence of heteroscedasticity nor overdispersion
+-   The standardised residuals are approximately normal
+-   There are no patterns to suggest non-linearity
+
+## To *Make* or not to *Make*
+
+The variable Make has many levels and thus introduces many degrees of freedom in the model. We might ask if introducing that many degrees of freedom is beneficial for the model.
+
+```{r}
+glm_no_make <- glm(Price~.-Make-Seller.Type-Engine-Torque-Drivetrain,data=train,family = Gamma(link="log"))
+summary(glm_no_make)
+```
+
+## To make or not to make
+
+```{r}
+scores[3,] <- list(Model="No make",
+                   df=summary(glm_no_make)$df[1],
+                   Dev=summary(glm_no_make)$deviance,
+                   AIC=summary(glm_no_make)$aic)
+scores
+```
+
+From a comparison with the first two models we see that both the deviance and AIC increase significantly if we remove Make, thus we are justified in keeping it. Further evidence comes from a LRT comparing the reduced and the no make model.
+
+```{r}
+st <- anova(glm_no_make,glm_reduced_make,"Chisq")
+print(paste("p-value =",round(pchisq(2*st$Deviance[2],st$Df[2],lower.tail = F),2)))
+```
+
+# Comparison
+
+## Similarities
+
+The LM and the GLM perform very similarly:
+
+-   The residuals do not show clear non-linearities nor heteroscedasticity
+-   The explained null deviance is $\approx 95\%$
+-   The mean absolute percentage error in prediction on test set is 17%
+-   The coefficients are mostly the same within one standard error
+
+Since both models are good, if we were to choose one of them, we would pick the simplest one which is the linear model.
+
+## Interpretation of parameters
+
+The interpretation of parameters is: upon one unit increase of the value of a variable adjusting for the others, the price increases or decreases by a factor of $exp(\beta)$, according to the sign of the coefficient.
+
+For instance, an increase by 10'000km amounts to a decrease in price of about 1%
+
+## Interpretation of parameters
+
+For categorical variables, for each level the coefficient is such that the price increases or decreases by a factor of $exp(\beta)$ with respect to the price of the base level.
+
+For instance, Unregistered cars cost 13% more than cars with one previous owner.
+
+## To *Make*!
+
+```{r}
+gz <- as.numeric(coef(glm_reduced_make)[2:33]>0)
+mks<- sort(unique(train$Make))[-1][coef(glm_reduced_make)[2:33]>0]
+
+price <- character(length=nrow(train))
+price[train$Make %in% mks] <- "Higher"
+price[!(train$Make %in% mks)] <- "Lower"
+price[train$Make == "Audi"] <- "Baseline"
+
+med <- log(median(train[train$Make=="Audi",]$Price))
+ggplot(train,aes(x=Make,y=log(Price),col=price,fill=price))+geom_boxplot(alpha=0.4)+geom_hline(aes(yintercept=med))+theme(axis.text.x=element_text(angle = -90, hjust = 0))+scale_fill_manual(values = c("grey","#389129","#ad1d13"))+scale_color_manual(values = c("grey","#389129","#ad1d13"))
+```
+
+# Bonus
+
+## Random Forest
+
+If the only aim of the model is to make prediction, a non parametric one could be also a possible solution. For this reason we tried to fit a random forest.
+
+-   Performs better in prediction, with an error of $\approx 9\%$
+-   Worse interpretability
+-   Hard to understand the real model
+
+## Variable Importance
+
+```{r}
+car<-read.csv("car.csv")
+
+# Transform categorical variables into factors
+car$Make <- as.factor(car$Make)
+car$Fuel.Type <- as.factor(car$Fuel.Type)
+car$Transmission <- as.factor(car$Transmission)
+car$Owner <- as.factor(car$Owner)
+car$Seller.Type<- as.factor(car$Seller.Type)
+car$Drivetrain <- as.factor(car$Drivetrain)
+car$SeatingCapacity <- as.factor(car$SeatingCapacity)
+
+car <- car[car$Kilometer != 2000,]
+
+set.seed(1)
+index <- sample(nrow(car),nrow(car)*0.8,replace = F)
+train <- car[index,]
+test <- car[-index,]
+
+library(randomForest)
+m1 <- randomForest(
+  formula = Price ~ .,
+  data = car
+)
+
+varImpPlot(m1)
+```
+
+# Thank you!
